@@ -1,0 +1,17 @@
+services:
+  _defaults:
+    public: true
+    autowire: true
+    autoconfigure: true
+
+  # Admin Configuration Controller
+  ShopVote\ShopVoteReviews\Controller\Admin\ConfigurationController:
+    class: ShopVote\ShopVoteReviews\Controller\Admin\ConfigurationController
+    arguments:
+      - '@shopvote.service.sync'
+      - '@shopvote.service.configuration'
+      - '@shopvote.repository.shop_summary'
+      - '@shopvote.repository.review'
+      - '@shopvote.repository.sync_log'
+    tags:
+      - { name: controller.service_arguments }

@@ -1,0 +1,14 @@
+services:
+  _defaults:
+    public: true
+    autowire: true
+    autoconfigure: true
+
+  # Cron Controller
+  ShopVote\ShopVoteReviews\Controller\Front\CronController:
+    class: ShopVote\ShopVoteReviews\Controller\Front\CronController
+    arguments:
+      - '@shopvote.service.sync'
+      - '@shopvote.service.configuration'
+    tags:
+      - { name: controller.service_arguments }

@@ -1,0 +1,408 @@
+{% extends '@PrestaShop/Admin/layout.html.twig' %}
+
+{% block content %}
+<div class="shopvote-configuration">
+    {# Flash messages #}
+    {% for type, messages in app.flashes %}
+        {% for message in messages %}
+            <div class="alert alert-{{ type == 'error' ? 'danger' : type }}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endfor %}
+
+    <div class="row">
+        {# Left column: Configuration form #}
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-header-title">
+                        <i class="material-icons">settings</i>
+                        {{ 'ShopVote Configuration'|trans({}, 'Modules.Shopvotereviews.Admin') }}
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <form method="post" id="shopvote-config-form">
+                        {# General Settings #}
+                        <div class="form-group row">
+                            <label class="form-control-label col-lg-3">
+                                {{ 'Enable Module'|trans({}, 'Modules.Shopvotereviews.Admin') }}
+                            </label>
+                            <div class="col-lg-9">
+                                <div class="form-check form-switch">
+                                    <input type="checkbox" class="form-check-input" name="enabled" id="enabled" value="1" {{ config.ENABLED ? 'checked' : '' }}>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr>
+                        <h4>{{ 'API Settings'|trans({}, 'Modules.Shopvotereviews.Admin') }}</h4>
+
+                        <div class="form-group row">
+                            <label class="form-control-label col-lg-3" for="shop_id">
+                                {{ 'ShopVote Shop ID'|trans({}, 'Modules.Shopvotereviews.Admin') }} *
+                            </label>
+                            <div class="col-lg-9">
+                                <input type="text" class="form-control" name="shop_id" id="shop_id" value="{{ config.SHOP_ID }}" required>
+                                <small class="form-text text-muted">{{ 'Your ShopVote Shop ID from the ShopVote dashboard.'|trans({}, 'Modules.Shopvotereviews.Admin') }}</small>
+                            </div>
+                        </div>
+
+                        <div class="form-group row">
+                            <label class="form-control-label col-lg-3" for="api_key">
+                                {{ 'API Key'|trans({}, 'Modules.Shopvotereviews.Admin') }} *
+                            </label>
+                            <div class="col-lg-9">
+                                <input type="password" class="form-control" name="api_key" id="api_key" placeholder="{{ config.API_KEY_SET ? '••••••••' : 'Enter API Key' }}">
+                                <small class="form-text text-muted">{{ 'Leave empty to keep current key. Your ShopVote API key (from ShopVote dashboard).'|trans({}, 'Modules.Shopvotereviews.Admin') }}</small>
+                            </div>
+                        </div>
+
+                        <div class="form-group row">
+                            <label class="form-control-label col-lg-3" for="preferred_mode">
+                                {{ 'API Mode'|trans({}, 'Modules.Shopvotereviews.Admin') }}
+                            </label>
+                            <div class="col-lg-9">
+                                <select class="form-control" name="preferred_mode" id="preferred_mode">
+                                    {% for key, label in api_modes %}
+                                        <option value="{{ key }}" {{ config.PREFERRED_MODE == key ? 'selected' : '' }}>{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                                <small class="form-text text-muted">{{ 'Select based on your ShopVote subscription. Premium plans support last25ext.'|trans({}, 'Modules.Shopvotereviews.Admin') }}</small>
+                            </div>
+                        </div>
+
+                        <div class="form-group row">
+                            <label class="form-control-label col-lg-3" for="min_interval">
+                                {{ 'Minimum Sync Interval (seconds)'|trans({}, 'Modules.Shopvotereviews.Admin') }}
+                            </label>
+                            <div class="col-lg-9">
+                                <input type="number" class="form-control" name="min_interval" id="min_interval" value="{{ config.MIN_INTERVAL }}" min="60" max="86400">
+                                <small class="form-text text-muted">{{ 'Minimum time between API calls (60-86400 seconds).'|trans({}, 'Modules.Shopvotereviews.Admin') }}</small>
+                            </div>
+                        </div>
+
+                        <hr>
+                        <h4>{{ 'Display Settings'|trans({}, 'Modules.Shopvotereviews.Admin') }}</h4>
+
+                        <div class="form-group row">
+                            <label class="form-control-label col-lg-3" for="reviews_to_show">
+                                {{ 'Reviews to Display'|trans({}, 'Modules.Shopvotereviews.Admin') }}
+                            </label>
+                            <div class="col-lg-9">
+                                <input type="number" class="form-control" name="reviews_to_show" id="reviews_to_show" value="{{ config.REVIEWS_TO_SHOW }}" min="1" max="25">
+                            </div>
+                        </div>
+
+                        <div class="form-group row">
+                            <label class="form-control-label col-lg-3">
+                                {{ 'Show Reviewer Name'|trans({}, 'Modules.Shopvotereviews.Admin') }}
+                            </label>
+                            <div class="col-lg-9">
+                                <div class="form-check form-switch">
+                                    <input type="checkbox" class="form-check-input" name="show_reviewer_name" id="show_reviewer_name" value="1" {{ config.SHOW_REVIEWER_NAME ? 'checked' : '' }}>
+                                </div>
+                                <small class="form-text text-muted">{{ 'If disabled, reviewer names will be anonymized (GDPR compliance).'|trans({}, 'Modules.Shopvotereviews.Admin') }}</small>
+                            </div>
+                        </div>
+
+                        <div class="form-group row">
+                            <label class="form-control-label col-lg-3" for="excerpt_length">
+                                {{ 'Review Excerpt Length'|trans({}, 'Modules.Shopvotereviews.Admin') }}
+                            </label>
+                            <div class="col-lg-9">
+                                <input type="number" class="form-control" name="excerpt_length" id="excerpt_length" value="{{ config.EXCERPT_LENGTH }}" min="0" max="1000">
+                                <small class="form-text text-muted">{{ 'Maximum characters to show (0 for full text).'|trans({}, 'Modules.Shopvotereviews.Admin') }}</small>
+                            </div>
+                        </div>
+
+                        <div class="form-group row">
+                            <label class="form-control-label col-lg-3">
+                                {{ 'Show Shop Responses'|trans({}, 'Modules.Shopvotereviews.Admin') }}
+                            </label>
+                            <div class="col-lg-9">
+                                <div class="form-check form-switch">
+                                    <input type="checkbox" class="form-check-input" name="show_responses" id="show_responses" value="1" {{ config.SHOW_RESPONSES ? 'checked' : '' }}>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group row">
+                            <label class="form-control-label col-lg-3">
+                                {{ 'Display in Header'|trans({}, 'Modules.Shopvotereviews.Admin') }}
+                            </label>
+                            <div class="col-lg-9">
+                                <div class="form-check form-switch">
+                                    <input type="checkbox" class="form-check-input" name="display_header" id="display_header" value="1" {{ config.DISPLAY_HEADER ? 'checked' : '' }}>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group row">
+                            <label class="form-control-label col-lg-3">
+                                {{ 'Display in Footer'|trans({}, 'Modules.Shopvotereviews.Admin') }}
+                            </label>
+                            <div class="col-lg-9">
+                                <div class="form-check form-switch">
+                                    <input type="checkbox" class="form-check-input" name="display_footer" id="display_footer" value="1" {{ config.DISPLAY_FOOTER ? 'checked' : '' }}>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group row">
+                            <label class="form-control-label col-lg-3">
+                                {{ 'Enable JSON-LD (SEO)'|trans({}, 'Modules.Shopvotereviews.Admin') }}
+                            </label>
+                            <div class="col-lg-9">
+                                <div class="form-check form-switch">
+                                    <input type="checkbox" class="form-check-input" name="enable_jsonld" id="enable_jsonld" value="1" {{ config.ENABLE_JSONLD ? 'checked' : '' }}>
+                                </div>
+                                <small class="form-text text-muted">{{ 'Output structured data for search engines.'|trans({}, 'Modules.Shopvotereviews.Admin') }}</small>
+                            </div>
+                        </div>
+
+                        <hr>
+                        <h4>{{ 'Data Retention'|trans({}, 'Modules.Shopvotereviews.Admin') }}</h4>
+
+                        <div class="form-group row">
+                            <label class="form-control-label col-lg-3" for="data_retention_days">
+                                {{ 'Keep Reviews (days)'|trans({}, 'Modules.Shopvotereviews.Admin') }}
+                            </label>
+                            <div class="col-lg-9">
+                                <input type="number" class="form-control" name="data_retention_days" id="data_retention_days" value="{{ config.DATA_RETENTION_DAYS }}" min="0">
+                                <small class="form-text text-muted">{{ '0 = keep indefinitely.'|trans({}, 'Modules.Shopvotereviews.Admin') }}</small>
+                            </div>
+                        </div>
+
+                        <div class="form-group row">
+                            <label class="form-control-label col-lg-3" for="log_retention_count">
+                                {{ 'Keep Sync Logs (count)'|trans({}, 'Modules.Shopvotereviews.Admin') }}
+                            </label>
+                            <div class="col-lg-9">
+                                <input type="number" class="form-control" name="log_retention_count" id="log_retention_count" value="{{ config.LOG_RETENTION_COUNT }}" min="1" max="100">
+                            </div>
+                        </div>
+
+                        <div class="card-footer">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="material-icons">save</i>
+                                {{ 'Save'|trans({}, 'Admin.Actions') }}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            {# Cron Configuration #}
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h3 class="card-header-title">
+                        <i class="material-icons">schedule</i>
+                        {{ 'Cron Configuration'|trans({}, 'Modules.Shopvotereviews.Admin') }}
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label>{{ 'Cron URL'|trans({}, 'Modules.Shopvotereviews.Admin') }}</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="cron-url" value="{{ cron_url }}" readonly>
+                            <button type="button" class="btn btn-outline-secondary" onclick="navigator.clipboard.writeText(document.getElementById('cron-url').value)">
+                                <i class="material-icons">content_copy</i>
+                            </button>
+                        </div>
+                        <small class="form-text text-muted">{{ 'Add this URL to your cron scheduler (recommended: every 5-15 minutes).'|trans({}, 'Modules.Shopvotereviews.Admin') }}</small>
+                    </div>
+                    <div class="form-group">
+                        <label>{{ 'Example crontab entry:'|trans({}, 'Modules.Shopvotereviews.Admin') }}</label>
+                        <pre class="bg-light p-2"><code>*/15 * * * * curl -s "{{ cron_url }}" > /dev/null</code></pre>
+                    </div>
+                    <button type="button" class="btn btn-warning" id="btn-rotate-token">
+                        <i class="material-icons">refresh</i>
+                        {{ 'Rotate Token'|trans({}, 'Modules.Shopvotereviews.Admin') }}
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        {# Right column: Status and actions #}
+        <div class="col-lg-4">
+            {# Sync Status #}
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-header-title">
+                        <i class="material-icons">sync</i>
+                        {{ 'Sync Status'|trans({}, 'Modules.Shopvotereviews.Admin') }}
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <dl class="row">
+                        <dt class="col-sm-6">{{ 'Configured'|trans({}, 'Modules.Shopvotereviews.Admin') }}</dt>
+                        <dd class="col-sm-6">
+                            <span class="badge {{ sync_status.is_configured ? 'badge-success' : 'badge-danger' }}">
+                                {{ sync_status.is_configured ? 'Yes' : 'No' }}
+                            </span>
+                        </dd>
+
+                        <dt class="col-sm-6">{{ 'Reviews Stored'|trans({}, 'Modules.Shopvotereviews.Admin') }}</dt>
+                        <dd class="col-sm-6">{{ sync_status.review_count }}</dd>
+
+                        <dt class="col-sm-6">{{ 'Last Fetch'|trans({}, 'Modules.Shopvotereviews.Admin') }}</dt>
+                        <dd class="col-sm-6">{{ sync_status.last_fetch ?: 'Never' }}</dd>
+
+                        {% if sync_status.last_error %}
+                        <dt class="col-sm-6 text-danger">{{ 'Last Error'|trans({}, 'Modules.Shopvotereviews.Admin') }}</dt>
+                        <dd class="col-sm-6 text-danger">{{ sync_status.last_error }}</dd>
+                        {% endif %}
+                    </dl>
+
+                    {% if summary %}
+                    <hr>
+                    <h5>{{ 'Current Rating'|trans({}, 'Modules.Shopvotereviews.Admin') }}</h5>
+                    <div class="text-center">
+                        <div class="h2">{{ summary.rating_value_stars|number_format(1) }} / 5</div>
+                        <div>{{ summary.ratings_count }} {{ 'ratings'|trans({}, 'Modules.Shopvotereviews.Admin') }}</div>
+                        <div class="small text-muted">
+                            <span class="text-success">{{ summary.ratings_positive }} +</span> |
+                            <span class="text-warning">{{ summary.ratings_neutral }} o</span> |
+                            <span class="text-danger">{{ summary.ratings_negative }} -</span>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <hr>
+                    <button type="button" class="btn btn-primary w-100 mb-2" id="btn-fetch-now" {{ not sync_status.is_configured ? 'disabled' : '' }}>
+                        <i class="material-icons">sync</i>
+                        {{ 'Fetch Now'|trans({}, 'Modules.Shopvotereviews.Admin') }}
+                    </button>
+                    <button type="button" class="btn btn-danger w-100" id="btn-purge-data">
+                        <i class="material-icons">delete_forever</i>
+                        {{ 'Purge All Data'|trans({}, 'Modules.Shopvotereviews.Admin') }}
+                    </button>
+                </div>
+            </div>
+
+            {# Recent Logs #}
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h3 class="card-header-title">
+                        <i class="material-icons">history</i>
+                        {{ 'Recent Sync Logs'|trans({}, 'Modules.Shopvotereviews.Admin') }}
+                    </h3>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-sm table-striped mb-0">
+                        <thead>
+                            <tr>
+                                <th>{{ 'Time'|trans({}, 'Modules.Shopvotereviews.Admin') }}</th>
+                                <th>{{ 'Status'|trans({}, 'Modules.Shopvotereviews.Admin') }}</th>
+                                <th>{{ 'Reviews'|trans({}, 'Modules.Shopvotereviews.Admin') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for log in recent_logs %}
+                            <tr>
+                                <td class="small">{{ log.sync_time|date('Y-m-d H:i') }}</td>
+                                <td>
+                                    <span class="badge badge-{{ log.status == 'success' ? 'success' : (log.status == 'warning' ? 'warning' : 'danger') }}">
+                                        {{ log.status }}
+                                    </span>
+                                </td>
+                                <td>{{ log.reviews_updated }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="3" class="text-center text-muted">{{ 'No sync logs yet.'|trans({}, 'Modules.Shopvotereviews.Admin') }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Fetch Now button
+    document.getElementById('btn-fetch-now').addEventListener('click', function() {
+        const btn = this;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="material-icons spin">sync</i> {{ "Syncing..."|trans({}, "Modules.Shopvotereviews.Admin") }}';
+
+        fetch('{{ path("shopvote_admin_fetch") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: 'force=1'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('{{ "Sync completed successfully!"|trans({}, "Modules.Shopvotereviews.Admin") }} Reviews updated: ' + data.reviews_updated);
+                location.reload();
+            } else {
+                alert('{{ "Sync failed:"|trans({}, "Modules.Shopvotereviews.Admin") }} ' + data.error);
+            }
+        })
+        .catch(error => {
+            alert('{{ "Request failed:"|trans({}, "Modules.Shopvotereviews.Admin") }} ' + error);
+        })
+        .finally(() => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="material-icons">sync</i> {{ "Fetch Now"|trans({}, "Modules.Shopvotereviews.Admin") }}';
+        });
+    });
+
+    // Purge Data button
+    document.getElementById('btn-purge-data').addEventListener('click', function() {
+        if (!confirm('{{ "Are you sure you want to delete all stored reviews and data? This cannot be undone."|trans({}, "Modules.Shopvotereviews.Admin") }}')) {
+            return;
+        }
+
+        fetch('{{ path("shopvote_admin_purge") }}', {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('{{ "All data has been purged."|trans({}, "Modules.Shopvotereviews.Admin") }}');
+                location.reload();
+            } else {
+                alert('{{ "Failed to purge data."|trans({}, "Modules.Shopvotereviews.Admin") }}');
+            }
+        });
+    });
+
+    // Rotate Token button
+    document.getElementById('btn-rotate-token').addEventListener('click', function() {
+        if (!confirm('{{ "Are you sure you want to generate a new cron token? You will need to update your crontab."|trans({}, "Modules.Shopvotereviews.Admin") }}')) {
+            return;
+        }
+
+        fetch('{{ path("shopvote_admin_rotate_token") }}', {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('cron-url').value = data.cron_url;
+                alert('{{ "Token rotated successfully. Update your crontab with the new URL."|trans({}, "Modules.Shopvotereviews.Admin") }}');
+            } else {
+                alert('{{ "Failed to rotate token."|trans({}, "Modules.Shopvotereviews.Admin") }}');
+            }
+        });
+    });
+});
+</script>
+
+<style>
+.shopvote-configuration .material-icons.spin {
+    animation: spin 1s linear infinite;
+}
+@keyframes spin {
+    100% { transform: rotate(360deg); }
+}
+</style>
+{% endblock %}

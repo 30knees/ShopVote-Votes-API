@@ -1,0 +1,29 @@
+# Admin routes
+shopvote_admin_configuration:
+  path: /shopvote/configuration
+  methods: [GET, POST]
+  defaults:
+    _controller: 'ShopVote\ShopVoteReviews\Controller\Admin\ConfigurationController::index'
+    _legacy_controller: AdminShopVoteReviews
+    _legacy_link: AdminShopVoteReviews
+
+shopvote_admin_fetch:
+  path: /shopvote/fetch
+  methods: [POST]
+  defaults:
+    _controller: 'ShopVote\ShopVoteReviews\Controller\Admin\ConfigurationController::fetch'
+    _legacy_controller: AdminShopVoteReviews
+
+shopvote_admin_purge:
+  path: /shopvote/purge
+  methods: [POST]
+  defaults:
+    _controller: 'ShopVote\ShopVoteReviews\Controller\Admin\ConfigurationController::purge'
+    _legacy_controller: AdminShopVoteReviews
+
+shopvote_admin_rotate_token:
+  path: /shopvote/rotate-token
+  methods: [POST]
+  defaults:
+    _controller: 'ShopVote\ShopVoteReviews\Controller\Admin\ConfigurationController::rotateToken'
+    _legacy_controller: AdminShopVoteReviews
