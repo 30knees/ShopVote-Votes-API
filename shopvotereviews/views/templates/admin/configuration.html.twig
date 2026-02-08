@@ -251,7 +251,7 @@
 
                         {% if sync_status.last_error %}
                         <dt class="col-sm-6 text-danger">{{ 'Last Error'|trans({}, 'Modules.Shopvotereviews.Admin') }}</dt>
-                        <dd class="col-sm-6 text-danger">{{ sync_status.last_error }}</dd>
+                        <dd class="col-sm-6 text-danger">{{ sync_status.last_error|e('html') }}</dd>
                         {% endif %}
                     </dl>
 
@@ -324,6 +324,8 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    const csrfToken = '{{ csrf_token("shopvote_ajax") }}';
+
     // Fetch Now button
     document.getElementById('btn-fetch-now').addEventListener('click', function() {
         const btn = this;
@@ -335,7 +337,7 @@ document.addEventListener('DOMContentLoaded', function() {
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
             },
-            body: 'force=1'
+            body: 'force=1&_token=' + encodeURIComponent(csrfToken)
         })
         .then(response => response.json())
         .then(data => {
@@ -362,7 +364,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         fetch('{{ path("shopvote_admin_purge") }}', {
-            method: 'POST'
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: '_token=' + encodeURIComponent(csrfToken)
         })
         .then(response => response.json())
         .then(data => {
@@ -382,7 +388,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         fetch('{{ path("shopvote_admin_rotate_token") }}', {
-            method: 'POST'
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: '_token=' + encodeURIComponent(csrfToken)
         })
         .then(response => response.json())
         .then(data => {

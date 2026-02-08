@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace ShopVote\ShopVoteReviews\Controller\Admin;
 
 use PrestaShopBundle\Controller\Admin\FrameworkBundleAdminController;
+use PrestaShopBundle\Security\Annotation\AdminSecurity;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -126,9 +127,19 @@ class ConfigurationController extends FrameworkBundleAdminController
 
     /**
      * Manual fetch action
+     *
+     * @AdminSecurity("is_granted('update', request.get('_legacy_controller'))")
      */
     public function fetch(Request $request): JsonResponse
     {
+        // Validate CSRF token
+        if (!$this->isCsrfTokenValid('shopvote_ajax', $request->request->get('_token'))) {
+            return new JsonResponse([
+                'success' => false,
+                'error' => 'Invalid security token. Please refresh the page.',
+            ], 403);
+        }
+
         if (!$this->configurationService->isConfigured()) {
             return new JsonResponse([
                 'success' => false,
@@ -144,9 +155,19 @@ class ConfigurationController extends FrameworkBundleAdminController
 
     /**
      * Purge all data action
+     *
+     * @AdminSecurity("is_granted('delete', request.get('_legacy_controller'))")
      */
     public function purge(Request $request): JsonResponse
     {
+        // Validate CSRF token
+        if (!$this->isCsrfTokenValid('shopvote_ajax', $request->request->get('_token'))) {
+            return new JsonResponse([
+                'success' => false,
+                'error' => 'Invalid security token. Please refresh the page.',
+            ], 403);
+        }
+
         $this->syncService->purgeAllData();
 
         return new JsonResponse([
@@ -157,9 +178,19 @@ class ConfigurationController extends FrameworkBundleAdminController
 
     /**
      * Rotate cron token action
+     *
+     * @AdminSecurity("is_granted('update', request.get('_legacy_controller'))")
      */
     public function rotateToken(Request $request): JsonResponse
     {
+        // Validate CSRF token
+        if (!$this->isCsrfTokenValid('shopvote_ajax', $request->request->get('_token'))) {
+            return new JsonResponse([
+                'success' => false,
+                'error' => 'Invalid security token. Please refresh the page.',
+            ], 403);
+        }
+
         $newToken = $this->configurationService->rotateCronToken();
         $cronUrl = $this->generateUrl('module-shopvotereviews-cron') . '?token=' . $newToken;
 

@@ -294,19 +294,20 @@ class ShopVoteReviews extends Module implements WidgetInterface
             $processedReview = $review;
 
             if (!$showReviewerName) {
-                $processedReview['reviewer'] = $this->anonymizeReviewer($review['reviewer']);
+                $processedReview['reviewer'] = $this->anonymizeReviewer($review['reviewer'] ?? null);
             }
 
-            if ($excerptLength > 0 && strlen($review['review_text']) > $excerptLength) {
-                $processedReview['review_text_excerpt'] = mb_substr($review['review_text'], 0, $excerptLength) . '...';
+            $reviewText = $review['review_text'] ?? '';
+            if ($excerptLength > 0 && mb_strlen($reviewText) > $excerptLength) {
+                $processedReview['review_text_excerpt'] = mb_substr($reviewText, 0, $excerptLength) . '...';
                 $processedReview['has_more'] = true;
             } else {
-                $processedReview['review_text_excerpt'] = $review['review_text'];
+                $processedReview['review_text_excerpt'] = $reviewText;
                 $processedReview['has_more'] = false;
             }
 
-            if ($showResponses) {
-                $processedReview['answers'] = $reviewRepository->getReviewAnswers((int) $review['review_id']);
+            if ($showResponses && !empty($review['review_id'])) {
+                $processedReview['answers'] = $reviewRepository->getAnswersByReviewId($review['review_id']);
             } else {
                 $processedReview['answers'] = [];
             }
@@ -415,7 +416,7 @@ class ShopVoteReviews extends Module implements WidgetInterface
     /**
      * Anonymize reviewer name for privacy
      */
-    private function anonymizeReviewer(string $name): string
+    private function anonymizeReviewer(?string $name): string
     {
         if (empty($name)) {
             return $this->trans('Anonymous', [], 'Modules.Shopvotereviews.Shop');
@@ -424,8 +425,9 @@ class ShopVoteReviews extends Module implements WidgetInterface
         $parts = explode(' ', $name);
         $first = $parts[0] ?? '';
 
-        if (strlen($first) > 1) {
-            return mb_substr($first, 0, 1) . str_repeat('*', strlen($first) - 1);
+        $length = mb_strlen($first);
+        if ($length > 1) {
+            return mb_substr($first, 0, 1) . str_repeat('*', $length - 1);
         }
 
         return $first . '.';
