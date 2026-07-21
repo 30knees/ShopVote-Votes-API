@@ -33,6 +33,44 @@
     margin-top: 4px;
 }
 
+.shopvote-rating-compact {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 12px;
+    margin: 12px 0;
+    padding: 12px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    background: #fff;
+}
+
+.shopvote-compact-link {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    color: inherit;
+    text-decoration: none;
+}
+
+.shopvote-source-link {
+    display: inline-block;
+    margin: 8px;
+    font-size: 0.85em;
+}
+
+.shopvote-rating-snippet a:focus-visible,
+.shopvote-badge-link:focus-visible,
+.shopvote-sidebar-link:focus-visible,
+.shopvote-compact-link:focus-visible,
+.shopvote-view-all:focus-visible,
+.shopvote-source-link:focus-visible,
+.shopvote-review-details summary:focus-visible {
+    outline: 3px solid #005fcc;
+    outline-offset: 3px;
+}
+
 /* Rating Snippet (Header) */
 .shopvote-rating-snippet {
     display: inline-flex;
@@ -329,12 +367,26 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 18px;
-    height: 18px;
+    min-height: 22px;
+    padding: 2px 8px;
     background: #28a745;
     color: white;
-    border-radius: 50%;
-    font-size: 0.7em;
+    border-radius: 999px;
+    font-size: 0.8em;
+}
+
+.shopvote-review-details {
+    margin-top: 8px;
+}
+
+.shopvote-review-details summary {
+    color: #005fcc;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.shopvote-review-details p {
+    margin-top: 10px;
 }
 
 .shopvote-review-text {
@@ -458,5 +510,28 @@
 
     .shopvote-answer-shop {
         background: #1e3a5f;
+    }
+}
+
+@media (max-width: 575px) {
+    .shopvote-reviews-block {
+        padding: 20px 0;
+    }
+
+    .shopvote-review-item {
+        padding: 15px;
+    }
+
+    .shopvote-review-header,
+    .shopvote-rating-compact {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .shopvote-review-item,
+    .shopvote-badge-link {
+        transition: none;
     }
 }

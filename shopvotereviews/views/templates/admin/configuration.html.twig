@@ -22,7 +22,8 @@
                     </h3>
                 </div>
                 <div class="card-body">
-                    <form method="post" id="shopvote-config-form">
+                    <form method="post" action="{{ path('shopvote_admin_configuration_save') }}" id="shopvote-config-form">
+                        <input type="hidden" name="_token" value="{{ csrf_token('shopvote_configuration') }}">
                         {# General Settings #}
                         <div class="form-group row">
                             <label class="form-control-label col-lg-3">
@@ -129,7 +130,7 @@
 
                         <div class="form-group row">
                             <label class="form-control-label col-lg-3">
-                                {{ 'Display in Header'|trans({}, 'Modules.Shopvotereviews.Admin') }}
+                                {{ 'Display in Header Navigation'|trans({}, 'Modules.Shopvotereviews.Admin') }}
                             </label>
                             <div class="col-lg-9">
                                 <div class="form-check form-switch">
@@ -150,15 +151,72 @@
                         </div>
 
                         <div class="form-group row">
+                            <label class="form-control-label col-lg-3">{{ 'Display on Homepage'|trans({}, 'Modules.Shopvotereviews.Admin') }}</label>
+                            <div class="col-lg-9"><div class="form-check form-switch">
+                                <input type="checkbox" class="form-check-input" name="display_home" value="1" {{ config.DISPLAY_HOME ? 'checked' : '' }}>
+                            </div></div>
+                        </div>
+
+                        <div class="form-group row">
+                            <label class="form-control-label col-lg-3">{{ 'Display in Sidebar'|trans({}, 'Modules.Shopvotereviews.Admin') }}</label>
+                            <div class="col-lg-9"><div class="form-check form-switch">
+                                <input type="checkbox" class="form-check-input" name="display_sidebar" value="1" {{ config.DISPLAY_SIDEBAR ? 'checked' : '' }}>
+                            </div></div>
+                        </div>
+
+                        <div class="form-group row">
+                            <label class="form-control-label col-lg-3">{{ 'Display on Product Pages'|trans({}, 'Modules.Shopvotereviews.Admin') }}</label>
+                            <div class="col-lg-9"><div class="form-check form-switch">
+                                <input type="checkbox" class="form-check-input" name="display_product" value="1" {{ config.DISPLAY_PRODUCT ? 'checked' : '' }}>
+                            </div><small class="form-text text-muted">{{ 'Shown as “Shop rating” so it cannot be mistaken for a product rating.'|trans({}, 'Modules.Shopvotereviews.Admin') }}</small></div>
+                        </div>
+
+                        <div class="form-group row">
+                            <label class="form-control-label col-lg-3">{{ 'Display at Checkout'|trans({}, 'Modules.Shopvotereviews.Admin') }}</label>
+                            <div class="col-lg-9"><div class="form-check form-switch">
+                                <input type="checkbox" class="form-check-input" name="display_checkout" value="1" {{ config.DISPLAY_CHECKOUT ? 'checked' : '' }}>
+                            </div></div>
+                        </div>
+
+                        <div class="form-group row">
                             <label class="form-control-label col-lg-3">
-                                {{ 'Enable JSON-LD (SEO)'|trans({}, 'Modules.Shopvotereviews.Admin') }}
+                                {{ 'Advanced Structured Data'|trans({}, 'Modules.Shopvotereviews.Admin') }}
                             </label>
                             <div class="col-lg-9">
                                 <div class="form-check form-switch">
                                     <input type="checkbox" class="form-check-input" name="enable_jsonld" id="enable_jsonld" value="1" {{ config.ENABLE_JSONLD ? 'checked' : '' }}>
                                 </div>
-                                <small class="form-text text-muted">{{ 'Output structured data for search engines.'|trans({}, 'Modules.Shopvotereviews.Admin') }}</small>
+                                <small class="form-text text-warning">{{ 'Shop-rating data is emitted only on the reviews page. Google does not grant review rich results for self-serving Organization ratings.'|trans({}, 'Modules.Shopvotereviews.Admin') }}</small>
                             </div>
+                        </div>
+
+                        <hr>
+                        <h4>{{ 'Optional ShopVote Add-ons'|trans({}, 'Modules.Shopvotereviews.Admin') }}</h4>
+
+                        <div class="form-group row">
+                            <label class="form-control-label col-lg-3">{{ 'Enable EasyReviews'|trans({}, 'Modules.Shopvotereviews.Admin') }}</label>
+                            <div class="col-lg-9"><div class="form-check form-switch">
+                                <input type="checkbox" class="form-check-input" name="easyreviews_enabled" value="1" {{ config.EASYREVIEWS_ENABLED ? 'checked' : '' }}>
+                            </div></div>
+                        </div>
+
+                        <div class="form-group row">
+                            <label class="form-control-label col-lg-3" for="easyreviews_import_code">{{ 'Import ShopVote code'|trans({}, 'Modules.Shopvotereviews.Admin') }}</label>
+                            <div class="col-lg-9">
+                                <textarea class="form-control" name="easyreviews_import_code" id="easyreviews_import_code" rows="5" autocomplete="off"></textarea>
+                                <small class="form-text text-muted">{{ 'Paste the EasyReviews code from your ShopVote merchant account. The module stores only the validated ShopVote HTTPS script URL, token, and supported options; the pasted code is discarded.'|trans({}, 'Modules.Shopvotereviews.Admin') }}</small>
+                            </div>
+                        </div>
+
+                        <div class="form-group row">
+                            <label class="form-control-label col-lg-3">{{ 'Collect Product Reviews'|trans({}, 'Modules.Shopvotereviews.Admin') }}</label>
+                            <div class="col-lg-9"><div class="form-check form-switch">
+                                <input type="checkbox" class="form-check-input" name="product_reviews_enabled" value="1" {{ config.PRODUCT_REVIEWS_ENABLED ? 'checked' : '' }}>
+                            </div><small class="form-text text-muted">{{ 'Enable only if product-review collection is active in your ShopVote account.'|trans({}, 'Modules.Shopvotereviews.Admin') }}</small></div>
+                        </div>
+
+                        <div class="alert alert-info">
+                            {{ 'EasyReviews is shown to every eligible completed order—never only to satisfied customers. Update your privacy notice and ShopVote data-processing agreement before enabling it; consented order reference and email are sent to ShopVote only on the customer’s order-confirmation page.'|trans({}, 'Modules.Shopvotereviews.Admin') }}
                         </div>
 
                         <hr>
@@ -203,18 +261,18 @@
                 </div>
                 <div class="card-body">
                     <div class="form-group">
-                        <label>{{ 'Cron URL'|trans({}, 'Modules.Shopvotereviews.Admin') }}</label>
+                        <label>{{ 'Deprecated compatibility URL'|trans({}, 'Modules.Shopvotereviews.Admin') }}</label>
                         <div class="input-group">
                             <input type="text" class="form-control" id="cron-url" value="{{ cron_url }}" readonly>
                             <button type="button" class="btn btn-outline-secondary" onclick="navigator.clipboard.writeText(document.getElementById('cron-url').value)">
                                 <i class="material-icons">content_copy</i>
                             </button>
                         </div>
-                        <small class="form-text text-muted">{{ 'Add this URL to your cron scheduler (recommended: every 5-15 minutes).'|trans({}, 'Modules.Shopvotereviews.Admin') }}</small>
+                        <small class="form-text text-warning">{{ 'Query-string authentication remains available for 1.1 compatibility, but URLs can be recorded in logs. Use the authenticated POST command below.'|trans({}, 'Modules.Shopvotereviews.Admin') }}</small>
                     </div>
                     <div class="form-group">
-                        <label>{{ 'Example crontab entry:'|trans({}, 'Modules.Shopvotereviews.Admin') }}</label>
-                        <pre class="bg-light p-2"><code>*/15 * * * * curl -s "{{ cron_url }}" > /dev/null</code></pre>
+                        <label>{{ 'Preferred authenticated POST crontab entry:'|trans({}, 'Modules.Shopvotereviews.Admin') }}</label>
+                        <pre class="bg-light p-2"><code>*/15 * * * * curl -sS -X POST -H "Authorization: Bearer {{ cron_token }}" "{{ cron_endpoint }}" &gt; /dev/null</code></pre>
                     </div>
                     <button type="button" class="btn btn-warning" id="btn-rotate-token">
                         <i class="material-icons">refresh</i>
@@ -278,6 +336,54 @@
                         <i class="material-icons">delete_forever</i>
                         {{ 'Purge All Data'|trans({}, 'Modules.Shopvotereviews.Admin') }}
                     </button>
+                </div>
+            </div>
+
+            {# Review health and aggregate growth metrics #}
+            <div class="card mt-4">
+                <div class="card-header"><h3 class="card-header-title"><i class="material-icons">insights</i> {{ 'Review Health (30 days)'|trans({}, 'Modules.Shopvotereviews.Admin') }}</h3></div>
+                <div class="card-body">
+                    <dl class="row mb-2">
+                        <dt class="col-sm-8">{{ 'New reviews'|trans({}, 'Modules.Shopvotereviews.Admin') }}</dt><dd class="col-sm-4">{{ review_health.new_reviews }}</dd>
+                        <dt class="col-sm-8">{{ 'New verified reviews'|trans({}, 'Modules.Shopvotereviews.Admin') }}</dt><dd class="col-sm-4">{{ review_health.new_verified }}</dd>
+                        <dt class="col-sm-8">{{ 'Response coverage'|trans({}, 'Modules.Shopvotereviews.Admin') }}</dt><dd class="col-sm-4">{{ review_health.response_coverage }}%</dd>
+                        <dt class="col-sm-8">{{ 'Unanswered neutral/negative'|trans({}, 'Modules.Shopvotereviews.Admin') }}</dt><dd class="col-sm-4">{{ review_health.unanswered_attention }}</dd>
+                    </dl>
+                    <table class="table table-sm">
+                        <thead><tr><th>{{ 'Sentiment'|trans({}, 'Modules.Shopvotereviews.Admin') }}</th><th>{{ 'Current'|trans({}, 'Modules.Shopvotereviews.Admin') }}</th><th>{{ 'Previous'|trans({}, 'Modules.Shopvotereviews.Admin') }}</th></tr></thead>
+                        <tbody>
+                            <tr><td>{{ 'Positive'|trans({}, 'Modules.Shopvotereviews.Admin') }}</td><td>{{ review_health.positive_current }}</td><td>{{ review_health.positive_previous }}</td></tr>
+                            <tr><td>{{ 'Neutral'|trans({}, 'Modules.Shopvotereviews.Admin') }}</td><td>{{ review_health.neutral_current }}</td><td>{{ review_health.neutral_previous }}</td></tr>
+                            <tr><td>{{ 'Negative'|trans({}, 'Modules.Shopvotereviews.Admin') }}</td><td>{{ review_health.negative_current }}</td><td>{{ review_health.negative_previous }}</td></tr>
+                        </tbody>
+                    </table>
+                    <a class="btn btn-outline-primary btn-sm" href="https://www.shopvote.de/betreiber/" target="_blank" rel="noopener noreferrer">
+                        {{ 'Respond in ShopVote'|trans({}, 'Modules.Shopvotereviews.Admin') }}
+                    </a>
+                </div>
+            </div>
+
+            <div class="card mt-4">
+                <div class="card-header"><h3 class="card-header-title"><i class="material-icons">bar_chart</i> {{ 'Aggregate Growth Metrics (30 days)'|trans({}, 'Modules.Shopvotereviews.Admin') }}</h3></div>
+                <div class="card-body">
+                    <dl class="row mb-3">
+                        <dt class="col-sm-8">{{ 'Widget views'|trans({}, 'Modules.Shopvotereviews.Admin') }}</dt><dd class="col-sm-4">{{ growth_summary.widget_views }}</dd>
+                        <dt class="col-sm-8">{{ 'ShopVote profile CTR'|trans({}, 'Modules.Shopvotereviews.Admin') }}</dt><dd class="col-sm-4">{{ growth_summary.profile_ctr }}%</dd>
+                        <dt class="col-sm-8">{{ 'Orders (current / previous)'|trans({}, 'Modules.Shopvotereviews.Admin') }}</dt><dd class="col-sm-4">{{ growth_summary.orders_current }} / {{ growth_summary.orders_previous }}</dd>
+                        <dt class="col-sm-8">{{ 'EasyReviews prompts'|trans({}, 'Modules.Shopvotereviews.Admin') }}</dt><dd class="col-sm-4">{{ growth_summary.easyreviews_prompts }}</dd>
+                        <dt class="col-sm-8">{{ 'New verified reviews'|trans({}, 'Modules.Shopvotereviews.Admin') }}</dt><dd class="col-sm-4">{{ growth_summary.new_verified_reviews }}</dd>
+                        <dt class="col-sm-8">{{ 'Positive-review share'|trans({}, 'Modules.Shopvotereviews.Admin') }}</dt><dd class="col-sm-4">{{ growth_summary.positive_share }}%</dd>
+                    </dl>
+                    <table class="table table-sm table-striped mb-0">
+                        <thead><tr><th>{{ 'Event'|trans({}, 'Modules.Shopvotereviews.Admin') }}</th><th>{{ 'Placement'|trans({}, 'Modules.Shopvotereviews.Admin') }}</th><th>{{ 'Count'|trans({}, 'Modules.Shopvotereviews.Admin') }}</th></tr></thead>
+                        <tbody>
+                        {% for metric in metric_overview %}
+                            <tr><td>{{ metric.event_name }}</td><td>{{ metric.placement }}</td><td>{{ metric.event_count }}</td></tr>
+                        {% else %}
+                            <tr><td colspan="3" class="text-center text-muted">{{ 'No aggregate events yet.'|trans({}, 'Modules.Shopvotereviews.Admin') }}</td></tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
@@ -398,7 +504,8 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(data => {
             if (data.success) {
                 document.getElementById('cron-url').value = data.cron_url;
-                alert('{{ "Token rotated successfully. Update your crontab with the new URL."|trans({}, "Modules.Shopvotereviews.Admin") }}');
+                alert('{{ "Token rotated successfully. Reloading so you can copy the new POST command."|trans({}, "Modules.Shopvotereviews.Admin") }}');
+                location.reload();
             } else {
                 alert('{{ "Failed to rotate token."|trans({}, "Modules.Shopvotereviews.Admin") }}');
             }

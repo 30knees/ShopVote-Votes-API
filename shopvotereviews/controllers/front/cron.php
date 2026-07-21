@@ -35,18 +35,29 @@ class ShopVoteReviewsCronModuleFrontController extends ModuleFrontController
         parent::initContent();
 
         header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store');
+        header('Referrer-Policy: no-referrer');
 
         // Get services
         $syncService = $this->module->get('shopvote.service.sync');
         $configService = $this->module->get('shopvote.service.configuration');
 
-        // Validate token
-        $token = Tools::getValue('token', '');
+        $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
+        $authorization = (string) ($_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '');
+        $usesDeprecatedQueryToken = false;
+        $token = '';
 
-        if (empty($token)) {
+        if ($method === 'POST' && preg_match('/^Bearer\s+([^\s]+)$/i', trim($authorization), $matches)) {
+            $token = $matches[1];
+        } elseif ($method === 'GET') {
+            $token = (string) Tools::getValue('token', '');
+            $usesDeprecatedQueryToken = $token !== '';
+        }
+
+        if ($token === '') {
             $this->sendResponse([
                 'success' => false,
-                'error' => 'Missing token parameter.',
+                'error' => 'Use POST with an Authorization: Bearer header.',
             ], 401);
             return;
         }
@@ -57,6 +68,11 @@ class ShopVoteReviewsCronModuleFrontController extends ModuleFrontController
                 'error' => 'Invalid token.',
             ], 403);
             return;
+        }
+
+        if ($usesDeprecatedQueryToken) {
+            header('Deprecation: true');
+            header('Warning: 299 - "Query-string cron authentication is deprecated and will be removed in version 2.0."');
         }
 
         // Check if enabled
@@ -80,9 +96,16 @@ class ShopVoteReviewsCronModuleFrontController extends ModuleFrontController
         // Perform sync
         $result = $syncService->sync(false);
 
-        $statusCode = $result->success ? 200 : ($result->skipped ? 429 : 500);
+        $statusCode = $result->success
+            ? 200
+            : ($result->locked ? 409 : ($result->skipped ? 429 : 500));
 
-        $this->sendResponse($result->toArray(), $statusCode);
+        $response = $result->toArray();
+        if ($usesDeprecatedQueryToken) {
+            $response['deprecation'] = 'Query-string authentication is deprecated; use an Authorization: Bearer header.';
+        }
+
+        $this->sendResponse($response, $statusCode);
     }
 
     /**

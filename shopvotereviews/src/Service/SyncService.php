@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace ShopVote\ShopVoteReviews\Service;
 
 use Configuration;
+use Db;
 use ShopVote\ShopVoteReviews\Api\ShopVoteApiClient;
 use ShopVote\ShopVoteReviews\Api\XmlParser;
 use ShopVote\ShopVoteReviews\Api\XmlParseException;
@@ -19,7 +20,9 @@ use ShopVote\ShopVoteReviews\Repository\ShopSummaryRepository;
 use ShopVote\ShopVoteReviews\Repository\ReviewRepository;
 use ShopVote\ShopVoteReviews\Repository\SyncLogRepository;
 use ShopVote\ShopVoteReviews\Repository\SyncLockRepository;
+use ShopVote\ShopVoteReviews\Repository\MetricsRepository;
 use ShopVoteReviews;
+use ShopVote\ShopVoteReviews\Support\ConfigurationValue;
 
 class SyncService
 {
@@ -41,13 +44,17 @@ class SyncService
     /** @var SyncLockRepository */
     private $syncLockRepository;
 
+    /** @var MetricsRepository */
+    private $metricsRepository;
+
     public function __construct(
         ShopVoteApiClient $apiClient,
         XmlParser $xmlParser,
         ShopSummaryRepository $summaryRepository,
         ReviewRepository $reviewRepository,
         SyncLogRepository $syncLogRepository,
-        SyncLockRepository $syncLockRepository
+        SyncLockRepository $syncLockRepository,
+        MetricsRepository $metricsRepository
     ) {
         $this->apiClient = $apiClient;
         $this->xmlParser = $xmlParser;
@@ -55,6 +62,7 @@ class SyncService
         $this->reviewRepository = $reviewRepository;
         $this->syncLogRepository = $syncLogRepository;
         $this->syncLockRepository = $syncLockRepository;
+        $this->metricsRepository = $metricsRepository;
     }
 
     /**
@@ -93,6 +101,11 @@ class SyncService
 
         try {
             $result = $this->performSync();
+        } catch (\Throwable $e) {
+            $result->error = 'The synchronized data could not be persisted.';
+            Configuration::updateValue(ShopVoteReviews::CONFIG_KEYS['LAST_ERROR'], $result->error);
+            Configuration::updateValue(ShopVoteReviews::CONFIG_KEYS['LAST_ERROR_TIME'], date('Y-m-d H:i:s'));
+            $this->syncLogRepository->logError('persistence', 0, $e->getMessage());
         } finally {
             // Always release lock
             $this->syncLockRepository->releaseLock();
@@ -118,13 +131,17 @@ class SyncService
     public function canSync(): bool
     {
         $lastFetch = Configuration::get(ShopVoteReviews::CONFIG_KEYS['LAST_FETCH']);
-        $minInterval = (int) Configuration::get(ShopVoteReviews::CONFIG_KEYS['MIN_INTERVAL']) ?: 300;
+        $minInterval = $this->getIntegerConfiguration('MIN_INTERVAL', 300);
 
         if (empty($lastFetch)) {
             return true;
         }
 
         $lastFetchTime = strtotime($lastFetch);
+        if ($lastFetchTime === false) {
+            return true;
+        }
+
         $nextAllowedTime = $lastFetchTime + $minInterval;
 
         return time() >= $nextAllowedTime;
@@ -136,13 +153,17 @@ class SyncService
     public function getSecondsUntilNextSync(): int
     {
         $lastFetch = Configuration::get(ShopVoteReviews::CONFIG_KEYS['LAST_FETCH']);
-        $minInterval = (int) Configuration::get(ShopVoteReviews::CONFIG_KEYS['MIN_INTERVAL']) ?: 300;
+        $minInterval = $this->getIntegerConfiguration('MIN_INTERVAL', 300);
 
         if (empty($lastFetch)) {
             return 0;
         }
 
         $lastFetchTime = strtotime($lastFetch);
+        if ($lastFetchTime === false) {
+            return 0;
+        }
+
         $nextAllowedTime = $lastFetchTime + $minInterval;
         $remaining = $nextAllowedTime - time();
 
@@ -196,17 +217,30 @@ class SyncService
         // Update last fetch time
         if ($result->success) {
             Configuration::updateValue(ShopVoteReviews::CONFIG_KEYS['LAST_FETCH'], date('Y-m-d H:i:s'));
-            Configuration::updateValue(ShopVoteReviews::CONFIG_KEYS['LAST_FETCH_STATUS'], 'success');
+            Configuration::updateValue(ShopVoteReviews::CONFIG_KEYS['LAST_FETCH_STATUS'], $result->partial ? 'partial' : 'success');
+            Configuration::updateValue(ShopVoteReviews::CONFIG_KEYS['LAST_ERROR'], '');
+            Configuration::updateValue(ShopVoteReviews::CONFIG_KEYS['LAST_ERROR_TIME'], '');
 
-            $this->syncLogRepository->logSuccess(
-                $actualFunction,
-                $result->reviewsUpdated,
-                "Synced successfully. Summary: " . ($result->hasSummary ? 'yes' : 'no') .
-                ", Reviews: {$result->reviewsUpdated}"
-            );
+            $message = ($result->partial ? 'Partially synced. ' : 'Synced successfully. ') .
+                'Summary: ' . ($result->hasSummary ? 'yes' : 'no') .
+                ", Reviews: {$result->reviewsUpdated}" .
+                ($result->warnings ? ', Warnings: ' . implode(' ', $result->warnings) : '');
+
+            if ($result->partial) {
+                $this->syncLogRepository->log(
+                    $actualFunction,
+                    'warning',
+                    $result->httpCode,
+                    $result->reviewsUpdated,
+                    $message
+                );
+            } else {
+                $this->syncLogRepository->logSuccess($actualFunction, $result->reviewsUpdated, $message);
+            }
 
             // Cleanup old data
             $this->cleanup();
+
         } else {
             Configuration::updateValue(ShopVoteReviews::CONFIG_KEYS['LAST_ERROR'], $result->error);
             Configuration::updateValue(ShopVoteReviews::CONFIG_KEYS['LAST_ERROR_TIME'], date('Y-m-d H:i:s'));
@@ -242,6 +276,15 @@ class SyncService
             $parsedResponse = $this->xmlParser->parse($apiResponse->getBody());
             $this->saveData($parsedResponse, $result);
             $result->success = true;
+            $result->components['summary'] = $parsedResponse->hasSummary ? 'success' : 'unavailable';
+            $result->components['reviews'] = $parsedResponse->hasReviews ? 'success' : 'unavailable';
+            $result->partial = !$parsedResponse->hasSummary || !$parsedResponse->hasReviews;
+            if (!$parsedResponse->hasSummary) {
+                $result->warnings[] = 'The combined response contained no summary; the previous summary was preserved.';
+            }
+            if (!$parsedResponse->hasReviews) {
+                $result->warnings[] = 'The combined response contained no reviews.';
+            }
         } catch (XmlParseException $e) {
             $result->success = false;
             $result->error = 'XML parse error: ' . $e->getMessage();
@@ -278,9 +321,17 @@ class SyncService
                 $combinedParsed->ratingsNeutral = $starsParsed->ratingsNeutral;
                 $combinedParsed->ratingsNegative = $starsParsed->ratingsNegative;
                 $combinedParsed->commentsCount = $starsParsed->commentsCount;
+                $result->components['summary'] = $starsParsed->hasSummary ? 'success' : 'unavailable';
+                if (!$starsParsed->hasSummary) {
+                    $result->warnings[] = 'The rating summary response contained no summary data; the previous summary was preserved.';
+                }
             } catch (XmlParseException $e) {
-                // Continue without summary
+                $result->components['summary'] = 'failed';
+                $result->warnings[] = 'Rating summary XML was invalid; the previous summary was preserved.';
             }
+        } else {
+            $result->components['summary'] = 'failed';
+            $result->warnings[] = 'Rating summary request failed; the previous summary was preserved.';
         }
 
         // Then, get reviews
@@ -292,6 +343,7 @@ class SyncService
                 $reviewsParsed = $this->xmlParser->parse($reviewsResponse->getBody());
                 $combinedParsed->hasReviews = $reviewsParsed->hasReviews;
                 $combinedParsed->reviews = $reviewsParsed->reviews;
+                $result->components['reviews'] = 'success';
 
                 // Fill in shop info if not from stars
                 if ($combinedParsed->shopId === null) {
@@ -302,11 +354,13 @@ class SyncService
                 }
             } catch (XmlParseException $e) {
                 $result->success = false;
+                $result->components['reviews'] = 'failed';
                 $result->error = 'XML parse error (reviews): ' . $e->getMessage();
                 return $result;
             }
         } else {
             $result->success = false;
+            $result->components['reviews'] = 'failed';
             $result->error = $reviewsResponse->getError() ?? "HTTP {$reviewsResponse->getHttpCode()}";
             return $result;
         }
@@ -314,6 +368,7 @@ class SyncService
         // Save combined data
         $this->saveData($combinedParsed, $result);
         $result->success = true;
+        $result->partial = $result->components['summary'] !== 'success';
 
         return $result;
     }
@@ -338,6 +393,11 @@ class SyncService
             $parsedResponse = $this->xmlParser->parse($apiResponse->getBody());
             $this->saveData($parsedResponse, $result);
             $result->success = true;
+            $result->components['summary'] = $parsedResponse->hasSummary ? 'success' : 'unavailable';
+            if (!$parsedResponse->hasSummary) {
+                $result->success = false;
+                $result->error = 'The rating response contained no summary data.';
+            }
         } catch (XmlParseException $e) {
             $result->success = false;
             $result->error = 'XML parse error: ' . $e->getMessage();
@@ -351,18 +411,46 @@ class SyncService
      */
     private function saveData(ParsedResponse $parsed, SyncResult $result): void
     {
-        // Save summary
-        if ($parsed->hasSummary || $parsed->shopId !== null) {
-            $this->summaryRepository->saveSummary($parsed);
-            $result->hasSummary = true;
+        $db = Db::getInstance();
+        if (!$db->execute('START TRANSACTION')) {
+            throw new \RuntimeException('Could not start the database transaction.');
         }
 
-        // Save reviews
-        if ($parsed->hasReviews) {
-            foreach ($parsed->reviews as $review) {
-                $this->reviewRepository->saveReview($review);
-                $result->reviewsUpdated++;
+        try {
+            // A partial API response must never replace the last valid summary.
+            if ($parsed->hasSummary) {
+                if (!$this->summaryRepository->saveSummary($parsed)) {
+                    throw new \RuntimeException('Could not save the rating summary.');
+                }
+                $result->hasSummary = true;
             }
+
+            if ($parsed->hasReviews) {
+                foreach ($parsed->reviews as $review) {
+                    $affectedReviews = $this->reviewRepository->saveReview($review);
+                    if ($affectedReviews < 0) {
+                        throw new \RuntimeException('Could not save review ' . ($review->reviewId ?? 'unknown') . '.');
+                    }
+                    $result->reviewsUpdated += $affectedReviews;
+
+                    if ($affectedReviews === 1) {
+                        if (!$this->metricsRepository->increment('new_review', 'sync')
+                            || ($review->isVerified && !$this->metricsRepository->increment('verified_review', 'sync'))
+                            || ($review->reviewRatingStars !== null
+                                && $review->reviewRatingStars >= 4
+                                && !$this->metricsRepository->increment('positive_review', 'sync'))) {
+                            throw new \RuntimeException('Could not update aggregate review metrics.');
+                        }
+                    }
+                }
+            }
+
+            if (!$db->execute('COMMIT')) {
+                throw new \RuntimeException('Could not commit the database transaction.');
+            }
+        } catch (\Throwable $e) {
+            $db->execute('ROLLBACK');
+            throw $e;
         }
     }
 
@@ -371,8 +459,8 @@ class SyncService
      */
     private function cleanup(): void
     {
-        $logRetention = (int) Configuration::get(ShopVoteReviews::CONFIG_KEYS['LOG_RETENTION_COUNT']) ?: 10;
-        $dataRetention = (int) Configuration::get(ShopVoteReviews::CONFIG_KEYS['DATA_RETENTION_DAYS']) ?: 365;
+        $logRetention = $this->getIntegerConfiguration('LOG_RETENTION_COUNT', 10);
+        $dataRetention = $this->getIntegerConfiguration('DATA_RETENTION_DAYS', 365);
 
         $this->summaryRepository->cleanupOldSummaries($logRetention);
         $this->syncLogRepository->cleanupOldLogs($logRetention);
@@ -382,21 +470,38 @@ class SyncService
         }
     }
 
+    private function getIntegerConfiguration(string $key, int $default): int
+    {
+        $value = Configuration::get(ShopVoteReviews::CONFIG_KEYS[$key]);
+
+        return ConfigurationValue::integer($value, $default);
+    }
+
     /**
      * Purge all data (admin action)
      */
     public function purgeAllData(): bool
     {
-        $this->summaryRepository->purgeAll();
-        $this->reviewRepository->purgeAll();
-        $this->syncLogRepository->purgeAll();
-        $this->syncLockRepository->forceReleaseAllLocks();
+        $db = Db::getInstance();
+        if (!$db->execute('START TRANSACTION')) {
+            return false;
+        }
 
-        // Reset last fetch
-        Configuration::updateValue(ShopVoteReviews::CONFIG_KEYS['LAST_FETCH'], '');
-        Configuration::updateValue(ShopVoteReviews::CONFIG_KEYS['LAST_FETCH_STATUS'], '');
-        Configuration::updateValue(ShopVoteReviews::CONFIG_KEYS['LAST_ERROR'], '');
-        Configuration::updateValue(ShopVoteReviews::CONFIG_KEYS['LAST_ERROR_TIME'], '');
+        $success = $this->summaryRepository->purgeAll()
+            && $this->reviewRepository->purgeAll()
+            && $this->syncLogRepository->purgeAll()
+            && $this->syncLockRepository->forceReleaseAllLocks()
+            && $this->metricsRepository->purgeAll()
+            && Configuration::updateValue(ShopVoteReviews::CONFIG_KEYS['LAST_FETCH'], '')
+            && Configuration::updateValue(ShopVoteReviews::CONFIG_KEYS['LAST_FETCH_STATUS'], '')
+            && Configuration::updateValue(ShopVoteReviews::CONFIG_KEYS['LAST_ERROR'], '')
+            && Configuration::updateValue(ShopVoteReviews::CONFIG_KEYS['LAST_ERROR_TIME'], '');
+
+        if (!$success || !$db->execute('COMMIT')) {
+            $db->execute('ROLLBACK');
+
+            return false;
+        }
 
         return true;
     }

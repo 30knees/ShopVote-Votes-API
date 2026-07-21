@@ -12,6 +12,7 @@ namespace ShopVote\ShopVoteReviews\Repository;
 use Db;
 use Context;
 use ShopVote\ShopVoteReviews\Api\ParsedResponse;
+use ShopVote\ShopVoteReviews\Security\ShopVoteUrlValidator;
 
 class ShopSummaryRepository
 {
@@ -52,14 +53,14 @@ class ShopSummaryRepository
             'ratings_neutral' => (int) ($response->ratingsNeutral ?? 0),
             'ratings_negative' => (int) ($response->ratingsNegative ?? 0),
             'comments_count' => (int) ($response->commentsCount ?? 0),
-            'profile_url' => pSQL($response->profileUrl ?? ''),
-            'shop_url' => pSQL($response->shopUrl ?? ''),
+            'profile_url' => ($profileUrl = ShopVoteUrlValidator::normalize($response->profileUrl)) !== null ? pSQL($profileUrl) : null,
+            'shop_url' => $response->shopUrl !== null ? pSQL($response->shopUrl) : null,
             'last_vote' => $response->lastVote !== null ? $response->lastVote->format('Y-m-d H:i:s') : null,
             'fetched_at' => date('Y-m-d H:i:s'),
             'id_shop' => (int) $shopId,
         ];
 
-        return Db::getInstance()->insert('shopvote_shop_summary', $data);
+        return Db::getInstance()->insert('shopvote_shop_summary', $data, true);
     }
 
     /**

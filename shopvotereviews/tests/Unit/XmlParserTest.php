@@ -373,7 +373,7 @@ XML;
         $this->assertTrue($result1->hasData());
 
         // With summary
-        $xmlWithSummary = '<?xml version="1.0"?><shopvote><rating_summary><ratings_count>10</ratings_count></rating_summary></shopvote>';
+        $xmlWithSummary = '<?xml version="1.0"?><shopvote><rating_summary><rating_value><stars>4</stars></rating_value><ratings_count>10</ratings_count></rating_summary></shopvote>';
         $result2 = $this->parser->parse($xmlWithSummary);
         $this->assertTrue($result2->hasData());
 
@@ -401,5 +401,40 @@ XML;
 
         $result = $this->parser->parse($xml);
         $this->assertEquals(3, $result->getReviewCount());
+    }
+
+    public function testRejectsDocumentType(): void
+    {
+        $this->expectException(XmlParseException::class);
+        $this->parser->parse('<!DOCTYPE shopvote [<!ENTITY test "value">]><shopvote>&test;</shopvote>');
+    }
+
+    public function testRejectsOversizedXml(): void
+    {
+        $this->expectException(XmlParseException::class);
+        $this->parser->parse('<shopvote>' . str_repeat('a', 2097152) . '</shopvote>');
+    }
+
+    public function testEnforcesRatingAndCountBounds(): void
+    {
+        $result = $this->parser->parse(
+            '<shopvote><rating_summary><rating_value><stars>9</stars><score>101</score></rating_value>' .
+            '<ratings_count>-1</ratings_count></rating_summary></shopvote>'
+        );
+
+        $this->assertNull($result->ratingValueStars);
+        $this->assertNull($result->ratingValueScore);
+        $this->assertNull($result->ratingsCount);
+    }
+
+    public function testDropsUntrustedExternalUrls(): void
+    {
+        $result = $this->parser->parse(
+            '<shopvote><profile>javascript:alert(1)</profile><reviews><review id="1">' .
+            '<review_url>https://evil.example/review</review_url></review></reviews></shopvote>'
+        );
+
+        $this->assertNull($result->profileUrl);
+        $this->assertNull($result->reviews[0]->reviewUrl);
     }
 }

@@ -19,6 +19,7 @@ use ShopVote\ShopVoteReviews\Service\ConfigurationService;
 use ShopVote\ShopVoteReviews\Repository\ShopSummaryRepository;
 use ShopVote\ShopVoteReviews\Repository\ReviewRepository;
 use ShopVote\ShopVoteReviews\Repository\SyncLogRepository;
+use ShopVote\ShopVoteReviews\Repository\MetricsRepository;
 use ShopVoteReviews;
 
 class ConfigurationController extends FrameworkBundleAdminController
@@ -38,38 +39,48 @@ class ConfigurationController extends FrameworkBundleAdminController
     /** @var SyncLogRepository */
     private $syncLogRepository;
 
+    /** @var MetricsRepository */
+    private $metricsRepository;
+
     public function __construct(
         SyncService $syncService,
         ConfigurationService $configurationService,
         ShopSummaryRepository $summaryRepository,
         ReviewRepository $reviewRepository,
-        SyncLogRepository $syncLogRepository
+        SyncLogRepository $syncLogRepository,
+        MetricsRepository $metricsRepository
     ) {
         $this->syncService = $syncService;
         $this->configurationService = $configurationService;
         $this->summaryRepository = $summaryRepository;
         $this->reviewRepository = $reviewRepository;
         $this->syncLogRepository = $syncLogRepository;
+        $this->metricsRepository = $metricsRepository;
     }
 
     /**
      * Main configuration page
+     *
+     * @AdminSecurity("is_granted('read', request.get('_legacy_controller'))")
      */
     public function index(Request $request): Response
     {
-        // Handle form submission
-        if ($request->isMethod('POST')) {
-            return $this->handleFormSubmission($request);
-        }
-
         return $this->renderConfigurationPage();
     }
 
     /**
-     * Handle form submission
+     * Save configuration
+     *
+     * @AdminSecurity("is_granted('update', request.get('_legacy_controller'))")
      */
-    private function handleFormSubmission(Request $request): Response
+    public function save(Request $request): Response
     {
+        if (!$this->isCsrfTokenValid('shopvote_configuration', $request->request->get('_token'))) {
+            $this->addFlash('error', $this->trans('Invalid security token. Please refresh the page.', 'Modules.Shopvotereviews.Admin'));
+
+            return $this->redirectToRoute('shopvote_admin_configuration');
+        }
+
         $formData = [
             'ENABLED' => $request->request->getBoolean('enabled'),
             'SHOP_ID' => $request->request->get('shop_id', ''),
@@ -85,9 +96,24 @@ class ConfigurationController extends FrameworkBundleAdminController
             'ENABLE_JSONLD' => $request->request->getBoolean('enable_jsonld'),
             'DISPLAY_HEADER' => $request->request->getBoolean('display_header'),
             'DISPLAY_FOOTER' => $request->request->getBoolean('display_footer'),
+            'DISPLAY_HOME' => $request->request->getBoolean('display_home'),
+            'DISPLAY_SIDEBAR' => $request->request->getBoolean('display_sidebar'),
+            'DISPLAY_PRODUCT' => $request->request->getBoolean('display_product'),
+            'DISPLAY_CHECKOUT' => $request->request->getBoolean('display_checkout'),
+            'EASYREVIEWS_ENABLED' => $request->request->getBoolean('easyreviews_enabled'),
+            'PRODUCT_REVIEWS_ENABLED' => $request->request->getBoolean('product_reviews_enabled'),
         ];
 
         $errors = $this->configurationService->update($formData);
+
+        $easyReviewsSnippet = trim((string) $request->request->get('easyreviews_import_code', ''));
+        if ($easyReviewsSnippet !== '') {
+            try {
+                $this->configurationService->importEasyReviewsSnippet($easyReviewsSnippet);
+            } catch (\InvalidArgumentException | \RuntimeException $e) {
+                $errors['EASYREVIEWS_IMPORT'] = $e->getMessage();
+            }
+        }
 
         if (empty($errors)) {
             $this->addFlash('success', $this->trans('Settings saved successfully.', 'Modules.Shopvotereviews.Admin'));
@@ -97,7 +123,7 @@ class ConfigurationController extends FrameworkBundleAdminController
             }
         }
 
-        return $this->renderConfigurationPage();
+        return $this->redirectToRoute('shopvote_admin_configuration');
     }
 
     /**
@@ -112,15 +138,26 @@ class ConfigurationController extends FrameworkBundleAdminController
 
         // Generate cron URL
         $cronToken = $this->configurationService->getCronToken();
-        $cronUrl = $this->generateUrl('module-shopvotereviews-cron') . '?token=' . $cronToken;
+        $cronUrl = \Context::getContext()->link->getModuleLink(
+            'shopvotereviews',
+            'cron',
+            ['token' => $cronToken],
+            true
+        );
+        $cronEndpoint = \Context::getContext()->link->getModuleLink('shopvotereviews', 'cron', [], true);
 
         return $this->render('@Modules/shopvotereviews/views/templates/admin/configuration.html.twig', [
             'config' => $config,
             'sync_status' => $syncStatus,
             'summary' => $summary,
             'recent_logs' => $recentLogs,
+            'review_health' => $this->reviewRepository->getReviewHealth(),
+            'metric_overview' => $this->metricsRepository->getOverview(),
+            'growth_summary' => $this->metricsRepository->getDashboard(),
             'api_modes' => ShopVoteReviews::API_MODES,
             'cron_url' => $cronUrl,
+            'cron_endpoint' => $cronEndpoint,
+            'cron_token' => $cronToken,
             'module_name' => 'shopvotereviews',
         ]);
     }
@@ -192,7 +229,12 @@ class ConfigurationController extends FrameworkBundleAdminController
         }
 
         $newToken = $this->configurationService->rotateCronToken();
-        $cronUrl = $this->generateUrl('module-shopvotereviews-cron') . '?token=' . $newToken;
+        $cronUrl = \Context::getContext()->link->getModuleLink(
+            'shopvotereviews',
+            'cron',
+            ['token' => $newToken],
+            true
+        );
 
         return new JsonResponse([
             'success' => true,

@@ -19,9 +19,15 @@ require_once __DIR__ . '/vendor/autoload.php';
 
 use PrestaShop\PrestaShop\Core\Module\WidgetInterface;
 use ShopVote\ShopVoteReviews\Install\Installer;
+use ShopVote\ShopVoteReviews\Security\ShopVoteUrlValidator;
+use ShopVote\ShopVoteReviews\Support\ConfigurationValue;
+use ShopVote\ShopVoteReviews\Support\ReviewerAnonymizer;
 
 class ShopVoteReviews extends Module implements WidgetInterface
 {
+    /** @var array<string, array> Request-level widget data cache */
+    private array $widgetDataCache = [];
+
     /** @var string Module configuration prefix */
     public const CONFIG_PREFIX = 'SHOPVOTE_';
 
@@ -46,6 +52,16 @@ class ShopVoteReviews extends Module implements WidgetInterface
         'ENABLE_JSONLD' => self::CONFIG_PREFIX . 'ENABLE_JSONLD',
         'DISPLAY_HEADER' => self::CONFIG_PREFIX . 'DISPLAY_HEADER',
         'DISPLAY_FOOTER' => self::CONFIG_PREFIX . 'DISPLAY_FOOTER',
+        'DISPLAY_HOME' => self::CONFIG_PREFIX . 'DISPLAY_HOME',
+        'DISPLAY_SIDEBAR' => self::CONFIG_PREFIX . 'DISPLAY_SIDEBAR',
+        'DISPLAY_PRODUCT' => self::CONFIG_PREFIX . 'DISPLAY_PRODUCT',
+        'DISPLAY_CHECKOUT' => self::CONFIG_PREFIX . 'DISPLAY_CHECKOUT',
+        'EASYREVIEWS_ENABLED' => self::CONFIG_PREFIX . 'EASYREVIEWS_ENABLED',
+        'EASYREVIEWS_SCRIPT_URL' => self::CONFIG_PREFIX . 'EASYREVIEWS_SCRIPT_URL',
+        'EASYREVIEWS_TOKEN' => self::CONFIG_PREFIX . 'EASYREVIEWS_TOKEN',
+        'EASYREVIEWS_OPTIONS' => self::CONFIG_PREFIX . 'EASYREVIEWS_OPTIONS',
+        'PRODUCT_REVIEWS_ENABLED' => self::CONFIG_PREFIX . 'PRODUCT_REVIEWS_ENABLED',
+        'EVENT_SECRET' => self::CONFIG_PREFIX . 'EVENT_SECRET',
     ];
 
     /** @var array Available API modes */
@@ -59,7 +75,7 @@ class ShopVoteReviews extends Module implements WidgetInterface
     {
         $this->name = 'shopvotereviews';
         $this->tab = 'advertising_marketing';
-        $this->version = '1.0.0';
+        $this->version = '1.1.0';
         $this->author = 'ShopVote Integration';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = [
@@ -140,34 +156,30 @@ class ShopVoteReviews extends Module implements WidgetInterface
         return (bool) Configuration::get(self::CONFIG_KEYS['ENABLED']);
     }
 
-    /**
-     * Hook: displayHeader - Add CSS and JSON-LD
-     */
+    /** Hook: displayHeader - structured data only on the dedicated reviews page. */
     public function hookDisplayHeader(array $params): string
     {
         if (!$this->isModuleEnabled() || !$this->isConfigured()) {
             return '';
         }
 
-        $this->context->controller->registerStylesheet(
-            'shopvote-reviews-css',
-            'modules/' . $this->name . '/views/css/shopvote.css',
-            ['media' => 'all', 'priority' => 150]
-        );
-
-        $output = '';
-
-        // Add JSON-LD structured data if enabled
-        if (Configuration::get(self::CONFIG_KEYS['ENABLE_JSONLD'])) {
-            $output .= $this->getJsonLdOutput();
+        $controllerClass = strtolower(get_class($this->context->controller));
+        if (!str_contains($controllerClass, 'shopvotereviewsreviewsmodulefrontcontroller')) {
+            return '';
         }
 
-        // Display header rating snippet if enabled
-        if (Configuration::get(self::CONFIG_KEYS['DISPLAY_HEADER'])) {
-            $output .= $this->renderWidget('rating_snippet', []);
+        return Configuration::get(self::CONFIG_KEYS['ENABLE_JSONLD']) ? $this->getJsonLdOutput() : '';
+    }
+
+    /** Hook: displayNav1 - visible compact rating. */
+    public function hookDisplayNav1(array $params): string
+    {
+        if (!$this->isModuleEnabled() || !$this->isConfigured()
+            || !Configuration::get(self::CONFIG_KEYS['DISPLAY_HEADER'])) {
+            return '';
         }
 
-        return $output;
+        return $this->renderWidget('rating_snippet', ['placement' => 'header']);
     }
 
     /**
@@ -183,7 +195,7 @@ class ShopVoteReviews extends Module implements WidgetInterface
             return '';
         }
 
-        return $this->renderWidget('rating_badge', []);
+        return $this->renderWidget('rating_badge', ['placement' => 'footer']);
     }
 
     /**
@@ -191,11 +203,12 @@ class ShopVoteReviews extends Module implements WidgetInterface
      */
     public function hookDisplayHome(array $params): string
     {
-        if (!$this->isModuleEnabled() || !$this->isConfigured()) {
+        if (!$this->isModuleEnabled() || !$this->isConfigured()
+            || !Configuration::get(self::CONFIG_KEYS['DISPLAY_HOME'])) {
             return '';
         }
 
-        return $this->renderWidget('reviews_block', []);
+        return $this->renderWidget('reviews_block', ['placement' => 'homepage']);
     }
 
     /**
@@ -203,11 +216,12 @@ class ShopVoteReviews extends Module implements WidgetInterface
      */
     public function hookDisplayLeftColumn(array $params): string
     {
-        if (!$this->isModuleEnabled() || !$this->isConfigured()) {
+        if (!$this->isModuleEnabled() || !$this->isConfigured()
+            || !Configuration::get(self::CONFIG_KEYS['DISPLAY_SIDEBAR'])) {
             return '';
         }
 
-        return $this->renderWidget('rating_sidebar', []);
+        return $this->renderWidget('rating_sidebar', ['placement' => 'sidebar']);
     }
 
     /**
@@ -216,6 +230,116 @@ class ShopVoteReviews extends Module implements WidgetInterface
     public function hookDisplayRightColumn(array $params): string
     {
         return $this->hookDisplayLeftColumn($params);
+    }
+
+    public function hookDisplayProductAdditionalInfo(array $params): string
+    {
+        if (!$this->isModuleEnabled() || !$this->isConfigured()
+            || !Configuration::get(self::CONFIG_KEYS['DISPLAY_PRODUCT'])) {
+            return '';
+        }
+
+        return $this->renderWidget('rating_compact', [
+            'placement' => 'product',
+            'label' => $this->trans('Shop rating', [], 'Modules.Shopvotereviews.Shop'),
+        ]);
+    }
+
+    public function hookDisplayCheckoutSummaryTop(array $params): string
+    {
+        if (!$this->isModuleEnabled() || !$this->isConfigured()
+            || !Configuration::get(self::CONFIG_KEYS['DISPLAY_CHECKOUT'])) {
+            return '';
+        }
+
+        return $this->renderWidget('rating_compact', [
+            'placement' => 'checkout',
+            'label' => $this->trans('Customer shop rating', [], 'Modules.Shopvotereviews.Shop'),
+        ]);
+    }
+
+    public function hookDisplayOrderConfirmation(array $params): string
+    {
+        if (!$this->isModuleEnabled()) {
+            return '';
+        }
+
+        $order = $params['order'] ?? null;
+        if (!$order instanceof Order || !Validate::isLoadedObject($order)) {
+            return '';
+        }
+
+        if ($this->context->customer->isLogged()
+            && (int) $order->id_customer !== (int) $this->context->customer->id) {
+            return '';
+        }
+
+        $metrics = $this->get('shopvote.repository.metrics');
+        $metrics->increment('order_confirmation', 'order_confirmation');
+
+        if (!Configuration::get(self::CONFIG_KEYS['EASYREVIEWS_ENABLED'])) {
+            return '';
+        }
+
+        $scriptUrl = ShopVoteUrlValidator::normalize(
+            (string) Configuration::get(self::CONFIG_KEYS['EASYREVIEWS_SCRIPT_URL']),
+            true
+        );
+        $token = (string) Configuration::get(self::CONFIG_KEYS['EASYREVIEWS_TOKEN']);
+        if ($scriptUrl === null || !preg_match('/^[A-Za-z0-9_-]{8,256}$/', $token)) {
+            return '';
+        }
+
+        $customer = new Customer((int) $order->id_customer);
+        if (!Validate::isLoadedObject($customer) || !Validate::isEmail($customer->email)) {
+            return '';
+        }
+
+        $products = [];
+        if (Configuration::get(self::CONFIG_KEYS['PRODUCT_REVIEWS_ENABLED'])) {
+            foreach ($order->getProducts() as $orderProduct) {
+                $product = new Product(
+                    (int) $orderProduct['product_id'],
+                    false,
+                    (int) $this->context->language->id,
+                    (int) $this->context->shop->id
+                );
+                if (!Validate::isLoadedObject($product)) {
+                    continue;
+                }
+
+                $cover = Product::getCover((int) $product->id);
+                $products[] = [
+                    'url' => $this->context->link->getProductLink($product, null, null, null, null, null, (int) $orderProduct['product_attribute_id']),
+                    'image_url' => $cover
+                        ? $this->context->link->getImageLink($product->link_rewrite, $cover['id_image'], 'home_default')
+                        : '',
+                    'name' => (string) $orderProduct['product_name'],
+                    'gtin' => (string) ($orderProduct['product_ean13'] ?? ''),
+                    'sku' => (string) ($orderProduct['product_reference'] ?? ''),
+                    'brand' => (string) Manufacturer::getNameById((int) $product->id_manufacturer),
+                ];
+            }
+        }
+
+        $options = json_decode((string) Configuration::get(self::CONFIG_KEYS['EASYREVIEWS_OPTIONS']), true);
+        $language = strtoupper((string) ($options['language'] ?? $this->context->language->iso_code));
+        if (!in_array($language, ['DE', 'EN', 'FR', 'IT', 'NL', 'ES'], true)) {
+            $language = 'EN';
+        }
+
+        $this->smarty->assign([
+            'shopvote_easyreviews_script_url' => $scriptUrl,
+            'shopvote_easyreviews_token' => $token,
+            'shopvote_easyreviews_language' => $language,
+            'shopvote_customer_email' => $customer->email,
+            'shopvote_order_reference' => $order->reference,
+            'shopvote_order_products' => $products,
+        ]);
+
+        $metrics->increment('easyreviews_prompt', 'order_confirmation');
+
+        return $this->fetch('module:' . $this->name . '/views/templates/hook/easyreviews.tpl');
     }
 
     /**
@@ -231,6 +355,11 @@ class ShopVoteReviews extends Module implements WidgetInterface
             'shopvote-reviews-css',
             'modules/' . $this->name . '/views/css/shopvote.css',
             ['media' => 'all', 'priority' => 150]
+        );
+        $this->context->controller->registerJavascript(
+            'shopvote-reviews-metrics',
+            'modules/' . $this->name . '/views/js/metrics.js',
+            ['position' => 'bottom', 'priority' => 150]
         );
     }
 
@@ -248,6 +377,26 @@ class ShopVoteReviews extends Module implements WidgetInterface
                     'fc' => 'module',
                     'module' => 'shopvotereviews',
                     'controller' => 'cron',
+                ],
+            ],
+            'module-shopvotereviews-reviews' => [
+                'controller' => 'reviews',
+                'rule' => 'shop-reviews',
+                'keywords' => [],
+                'params' => [
+                    'fc' => 'module',
+                    'module' => 'shopvotereviews',
+                    'controller' => 'reviews',
+                ],
+            ],
+            'module-shopvotereviews-event' => [
+                'controller' => 'event',
+                'rule' => 'module/shopvotereviews/event',
+                'keywords' => [],
+                'params' => [
+                    'fc' => 'module',
+                    'module' => 'shopvotereviews',
+                    'controller' => 'event',
                 ],
             ],
         ];
@@ -277,21 +426,54 @@ class ShopVoteReviews extends Module implements WidgetInterface
      */
     public function getWidgetVariables($hookName, array $configuration): array
     {
+        $configuredLimit = Configuration::get(self::CONFIG_KEYS['REVIEWS_TO_SHOW']);
+        $reviewsToShow = isset($configuration['limit'])
+            ? max(1, min(25, (int) $configuration['limit']))
+            : ConfigurationValue::integer($configuredLimit, 5);
+        $fullText = !empty($configuration['full_text']);
+        $defaultPlacements = [
+            'rating_snippet' => 'header',
+            'rating_badge' => 'footer',
+            'rating_sidebar' => 'sidebar',
+            'rating_compact' => 'product',
+            'reviews_block' => 'homepage',
+        ];
+        $placement = preg_replace(
+            '/[^a-z_]/',
+            '',
+            (string) ($configuration['placement'] ?? ($defaultPlacements[$hookName] ?? 'homepage'))
+        ) ?: 'homepage';
+        $placementData = $this->buildPlacementVariables($placement, (string) ($configuration['label'] ?? ''));
+        $cacheKey = implode(':', [
+            (int) $this->context->shop->id,
+            (int) $this->context->language->id,
+            $reviewsToShow,
+            $fullText ? 1 : 0,
+        ]);
+
+        if (isset($this->widgetDataCache[$cacheKey])) {
+            return array_merge($this->widgetDataCache[$cacheKey], $placementData);
+        }
+
         $summaryRepository = $this->get('shopvote.repository.shop_summary');
         $reviewRepository = $this->get('shopvote.repository.review');
-
         $summary = $summaryRepository->getLatestSummary();
-        $reviewsToShow = (int) Configuration::get(self::CONFIG_KEYS['REVIEWS_TO_SHOW']) ?: 5;
         $reviews = $reviewRepository->getLatestReviews($reviewsToShow);
 
         $showReviewerName = (bool) Configuration::get(self::CONFIG_KEYS['SHOW_REVIEWER_NAME']);
-        $excerptLength = (int) Configuration::get(self::CONFIG_KEYS['EXCERPT_LENGTH']) ?: 200;
+        $configuredExcerptLength = Configuration::get(self::CONFIG_KEYS['EXCERPT_LENGTH']);
+        $excerptLength = $fullText
+            ? 0
+            : ConfigurationValue::integer($configuredExcerptLength, 200);
         $showResponses = (bool) Configuration::get(self::CONFIG_KEYS['SHOW_RESPONSES']);
+        $reviewIds = array_column($reviews, 'review_id');
+        $answersByReview = $showResponses ? $reviewRepository->getAnswersByReviewIds($reviewIds) : [];
 
         // Process reviews for display
         $processedReviews = [];
         foreach ($reviews as $review) {
             $processedReview = $review;
+            $processedReview['review_url'] = ShopVoteUrlValidator::normalize($review['review_url'] ?? null) ?? '';
 
             if (!$showReviewerName) {
                 $processedReview['reviewer'] = $this->anonymizeReviewer($review['reviewer'] ?? null);
@@ -306,24 +488,50 @@ class ShopVoteReviews extends Module implements WidgetInterface
                 $processedReview['has_more'] = false;
             }
 
-            if ($showResponses && !empty($review['review_id'])) {
-                $processedReview['answers'] = $reviewRepository->getAnswersByReviewId($review['review_id']);
-            } else {
-                $processedReview['answers'] = [];
-            }
+            $processedReview['answers'] = $showResponses && !empty($review['review_id'])
+                ? ($answersByReview[$review['review_id']] ?? [])
+                : [];
 
             $processedReviews[] = $processedReview;
         }
 
-        return [
+        $profileUrl = ShopVoteUrlValidator::normalize($summary['profile_url'] ?? null) ?? '';
+        $widgetData = [
             'shopvote_summary' => $summary,
             'shopvote_reviews' => $processedReviews,
             'shopvote_show_reviewer_name' => $showReviewerName,
             'shopvote_show_responses' => $showResponses,
             'shopvote_has_data' => !empty($summary),
             'shopvote_stars_html' => $this->generateStarsHtml($summary['rating_value_stars'] ?? 0),
-            'shopvote_profile_url' => $summary['profile_url'] ?? '',
+            'shopvote_profile_url' => $profileUrl,
+            'shopvote_reviews_url' => $this->context->link->getModuleLink($this->name, 'reviews', [], true),
             'shopvote_attribution' => 'Quelle: ShopVote.de',
+        ];
+
+        $this->widgetDataCache[$cacheKey] = $widgetData;
+
+        return array_merge($widgetData, $placementData);
+    }
+
+    private function buildPlacementVariables(string $placement, string $label): array
+    {
+        $expires = time() + 300;
+        $shopId = (int) $this->context->shop->id;
+        $secret = (string) Configuration::get(self::CONFIG_KEYS['EVENT_SECRET']);
+        $sign = static function (string $event) use ($placement, $expires, $shopId, $secret): string {
+            return $secret === ''
+                ? ''
+                : hash_hmac('sha256', $event . '|' . $placement . '|' . $expires . '|' . $shopId, $secret);
+        };
+
+        return [
+            'shopvote_placement' => $placement,
+            'shopvote_placement_label' => $label,
+            'shopvote_metric_endpoint' => $this->context->link->getModuleLink($this->name, 'event', [], true),
+            'shopvote_metric_expires' => $expires,
+            'shopvote_metric_shop_id' => $shopId,
+            'shopvote_view_signature' => $sign('widget_view'),
+            'shopvote_click_signature' => $sign('shopvote_profile_click'),
         ];
     }
 
@@ -336,6 +544,7 @@ class ShopVoteReviews extends Module implements WidgetInterface
             'rating_snippet' => 'views/templates/hook/rating_snippet.tpl',
             'rating_badge' => 'views/templates/hook/rating_badge.tpl',
             'rating_sidebar' => 'views/templates/hook/rating_sidebar.tpl',
+            'rating_compact' => 'views/templates/hook/rating_compact.tpl',
             'reviews_block' => 'views/templates/hook/reviews_block.tpl',
             'displayHome' => 'views/templates/hook/reviews_block.tpl',
             'displayLeftColumn' => 'views/templates/hook/rating_sidebar.tpl',
@@ -390,22 +599,28 @@ class ShopVoteReviews extends Module implements WidgetInterface
      */
     private function generateStarsHtml(float $rating): string
     {
+        $rating = max(0.0, min(5.0, $rating));
         $fullStars = (int) floor($rating);
         $hasHalfStar = ($rating - $fullStars) >= 0.5;
         $emptyStars = 5 - $fullStars - ($hasHalfStar ? 1 : 0);
 
-        $html = '<span class="shopvote-stars">';
+        $label = $this->trans(
+            'Rating: %rating% out of 5 stars',
+            ['%rating%' => number_format($rating, 1, '.', '')],
+            'Modules.Shopvotereviews.Shop'
+        );
+        $html = '<span class="shopvote-stars" role="img" aria-label="' . htmlspecialchars($label, ENT_QUOTES, 'UTF-8') . '">';
 
         for ($i = 0; $i < $fullStars; $i++) {
-            $html .= '<span class="shopvote-star shopvote-star-full">★</span>';
+            $html .= '<span class="shopvote-star shopvote-star-full" aria-hidden="true">★</span>';
         }
 
         if ($hasHalfStar) {
-            $html .= '<span class="shopvote-star shopvote-star-half">★</span>';
+            $html .= '<span class="shopvote-star shopvote-star-half" aria-hidden="true">★</span>';
         }
 
         for ($i = 0; $i < $emptyStars; $i++) {
-            $html .= '<span class="shopvote-star shopvote-star-empty">☆</span>';
+            $html .= '<span class="shopvote-star shopvote-star-empty" aria-hidden="true">☆</span>';
         }
 
         $html .= '</span>';
@@ -418,19 +633,10 @@ class ShopVoteReviews extends Module implements WidgetInterface
      */
     private function anonymizeReviewer(?string $name): string
     {
-        if (empty($name)) {
-            return $this->trans('Anonymous', [], 'Modules.Shopvotereviews.Shop');
-        }
-
-        $parts = explode(' ', $name);
-        $first = $parts[0] ?? '';
-
-        $length = mb_strlen($first);
-        if ($length > 1) {
-            return mb_substr($first, 0, 1) . str_repeat('*', $length - 1);
-        }
-
-        return $first . '.';
+        return ReviewerAnonymizer::anonymize(
+            $name,
+            $this->trans('Anonymous', [], 'Modules.Shopvotereviews.Shop')
+        );
     }
 
     /**

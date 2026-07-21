@@ -12,6 +12,7 @@ namespace ShopVote\ShopVoteReviews\Repository;
 use Db;
 use Context;
 use ShopVote\ShopVoteReviews\Api\ParsedReview;
+use ShopVote\ShopVoteReviews\Security\ShopVoteUrlValidator;
 
 class ReviewRepository
 {
@@ -126,58 +127,93 @@ class ReviewRepository
     }
 
     /**
+     * Batch-load answers keyed by ShopVote review ID.
+     *
+     * @param string[] $reviewIds
+     */
+    public function getAnswersByReviewIds(array $reviewIds, ?int $shopId = null): array
+    {
+        $shopId = $shopId ?? (int) Context::getContext()->shop->id;
+        $reviewIds = array_values(array_unique(array_filter($reviewIds, static fn ($id): bool => is_string($id) && $id !== '')));
+
+        if ($reviewIds === []) {
+            return [];
+        }
+
+        $quotedIds = array_map(static fn (string $id): string => '\'' . pSQL($id) . '\'', $reviewIds);
+        $sql = new \DbQuery();
+        $sql->select('*');
+        $sql->from('shopvote_review_answer');
+        $sql->where('id_shop = ' . (int) $shopId);
+        $sql->where('review_id IN (' . implode(',', $quotedIds) . ')');
+        $sql->orderBy('review_id ASC, answer_date ASC');
+
+        $answersByReview = [];
+        foreach (Db::getInstance()->executeS($sql) ?: [] as $answer) {
+            $answersByReview[$answer['review_id']][] = $answer;
+        }
+
+        return $answersByReview;
+    }
+
+    /**
      * Save or update a review (upsert)
      *
-     * @return int Number of affected reviews (1 if inserted/updated, 0 otherwise)
+     * @return int Database affected-row count, or -1 on failure
      */
     public function saveReview(ParsedReview $review, ?int $shopId = null): int
     {
         $shopId = $shopId ?? (int) Context::getContext()->shop->id;
 
+        if ($review->reviewId === null
+            || $review->reviewId === ''
+            || strlen($review->reviewId) > 64
+            || preg_match('/[\x00-\x1F\x7F]/', $review->reviewId)) {
+            return -1;
+        }
+
         $data = [
             'review_id' => pSQL($review->reviewId ?? ''),
-            'review_url' => pSQL($review->reviewUrl ?? ''),
+            'review_url' => ($reviewUrl = ShopVoteUrlValidator::normalize($review->reviewUrl)) !== null ? pSQL($reviewUrl) : null,
             'review_date' => $review->reviewDate !== null ? $review->reviewDate->format('Y-m-d H:i:s') : null,
             'reviewer' => pSQL($review->reviewer ?? ''),
             'review_rating_stars' => $review->reviewRatingStars !== null ? (float) $review->reviewRatingStars : null,
             'review_text' => pSQL($review->reviewText ?? '', true),
             'is_verified' => $review->isVerified ? 1 : 0,
             'fetched_at' => date('Y-m-d H:i:s'),
+            'last_seen_at' => date('Y-m-d H:i:s'),
             'id_shop' => (int) $shopId,
         ];
 
-        // Check if review exists
-        $existingReview = $this->getReviewByReviewId($review->reviewId, $shopId);
-
-        if ($existingReview) {
-            // Update existing review
-            $where = 'review_id = \'' . pSQL($review->reviewId) . '\' AND id_shop = ' . (int) $shopId;
-            Db::getInstance()->update('shopvote_review', $data, $where);
-        } else {
-            // Insert new review
-            Db::getInstance()->insert('shopvote_review', $data);
+        if (!Db::getInstance()->insert('shopvote_review', $data, true, true, Db::ON_DUPLICATE_KEY)) {
+            return -1;
         }
+        $affectedReviews = Db::getInstance()->Affected_Rows();
 
         // Save answers (replace all for this review)
-        $this->saveAnswers($review, $shopId);
+        if (!$this->saveAnswers($review, $shopId)) {
+            return -1;
+        }
 
-        return 1;
+        return $affectedReviews;
     }
 
     /**
      * Save review answers (replaces all existing answers)
      */
-    private function saveAnswers(ParsedReview $review, int $shopId): void
+    private function saveAnswers(ParsedReview $review, int $shopId): bool
     {
         if (empty($review->reviewId)) {
-            return;
+            return false;
         }
 
         // Delete existing answers for this review
-        Db::getInstance()->delete(
+        if (!Db::getInstance()->delete(
             'shopvote_review_answer',
             'review_id = \'' . pSQL($review->reviewId) . '\' AND id_shop = ' . (int) $shopId
-        );
+        )) {
+            return false;
+        }
 
         // Insert new answers
         foreach ($review->answers as $answer) {
@@ -189,8 +225,12 @@ class ReviewRepository
                 'id_shop' => (int) $shopId,
             ];
 
-            Db::getInstance()->insert('shopvote_review_answer', $data);
+            if (!Db::getInstance()->insert('shopvote_review_answer', $data, true)) {
+                return false;
+            }
         }
+
+        return true;
     }
 
     /**
@@ -211,6 +251,53 @@ class ReviewRepository
     }
 
     /**
+     * Merchant-facing review health summary. Counts only, with no customer data.
+     */
+    public function getReviewHealth(int $days = 30, ?int $shopId = null): array
+    {
+        $shopId = $shopId ?? (int) Context::getContext()->shop->id;
+        $days = max(1, min(365, $days));
+        $table = '`' . _DB_PREFIX_ . 'shopvote_review`';
+        $answerTable = '`' . _DB_PREFIX_ . 'shopvote_review_answer`';
+        $sql = 'SELECT
+                    COUNT(*) AS total,
+                    SUM(r.first_seen_at >= DATE_SUB(NOW(), INTERVAL ' . (int) $days . ' DAY)) AS new_reviews,
+                    SUM(r.is_verified = 1 AND r.first_seen_at >= DATE_SUB(NOW(), INTERVAL ' . (int) $days . ' DAY)) AS new_verified,
+                    SUM(r.review_rating_stars >= 4 AND r.review_date >= DATE_SUB(NOW(), INTERVAL ' . (int) $days . ' DAY)) AS positive_current,
+                    SUM(r.review_rating_stars >= 3 AND r.review_rating_stars < 4 AND r.review_date >= DATE_SUB(NOW(), INTERVAL ' . (int) $days . ' DAY)) AS neutral_current,
+                    SUM(r.review_rating_stars < 3 AND r.review_date >= DATE_SUB(NOW(), INTERVAL ' . (int) $days . ' DAY)) AS negative_current,
+                    SUM(r.review_rating_stars >= 4 AND r.review_date >= DATE_SUB(NOW(), INTERVAL ' . (int) ($days * 2) . ' DAY) AND r.review_date < DATE_SUB(NOW(), INTERVAL ' . (int) $days . ' DAY)) AS positive_previous,
+                    SUM(r.review_rating_stars >= 3 AND r.review_rating_stars < 4 AND r.review_date >= DATE_SUB(NOW(), INTERVAL ' . (int) ($days * 2) . ' DAY) AND r.review_date < DATE_SUB(NOW(), INTERVAL ' . (int) $days . ' DAY)) AS neutral_previous,
+                    SUM(r.review_rating_stars < 3 AND r.review_date >= DATE_SUB(NOW(), INTERVAL ' . (int) ($days * 2) . ' DAY) AND r.review_date < DATE_SUB(NOW(), INTERVAL ' . (int) $days . ' DAY)) AS negative_previous,
+                    SUM((r.review_rating_stars < 4) AND NOT EXISTS (
+                        SELECT 1 FROM ' . $answerTable . ' a
+                        WHERE a.review_id = r.review_id AND a.id_shop = r.id_shop AND a.answer_type = \'Shop\'
+                    )) AS unanswered_attention,
+                    SUM(EXISTS (
+                        SELECT 1 FROM ' . $answerTable . ' a
+                        WHERE a.review_id = r.review_id AND a.id_shop = r.id_shop AND a.answer_type = \'Shop\'
+                    )) AS answered
+                FROM ' . $table . ' r
+                WHERE r.id_shop = ' . (int) $shopId;
+
+        $row = Db::getInstance()->getRow($sql) ?: [];
+        $total = (int) ($row['total'] ?? 0);
+
+        return [
+            'new_reviews' => (int) ($row['new_reviews'] ?? 0),
+            'new_verified' => (int) ($row['new_verified'] ?? 0),
+            'positive_current' => (int) ($row['positive_current'] ?? 0),
+            'neutral_current' => (int) ($row['neutral_current'] ?? 0),
+            'negative_current' => (int) ($row['negative_current'] ?? 0),
+            'positive_previous' => (int) ($row['positive_previous'] ?? 0),
+            'neutral_previous' => (int) ($row['neutral_previous'] ?? 0),
+            'negative_previous' => (int) ($row['negative_previous'] ?? 0),
+            'unanswered_attention' => (int) ($row['unanswered_attention'] ?? 0),
+            'response_coverage' => $total > 0 ? round(((int) ($row['answered'] ?? 0) / $total) * 100, 1) : 0.0,
+        ];
+    }
+
+    /**
      * Delete old reviews based on retention days
      */
     public function cleanupOldReviews(int $retentionDays = 365, ?int $shopId = null): int
@@ -224,7 +311,7 @@ class ReviewRepository
         $sql->select('review_id');
         $sql->from('shopvote_review');
         $sql->where('id_shop = ' . (int) $shopId);
-        $sql->where('fetched_at < \'' . pSQL($cutoffDate) . '\'');
+        $sql->where('last_seen_at < \'' . pSQL($cutoffDate) . '\'');
 
         $results = Db::getInstance()->executeS($sql);
         $reviewIds = array_column($results ?: [], 'review_id');
@@ -235,18 +322,22 @@ class ReviewRepository
 
         // Delete answers for these reviews
         $reviewIdsQuoted = array_map(fn($id) => '\'' . pSQL($id) . '\'', $reviewIds);
-        Db::getInstance()->execute(
+        if (!Db::getInstance()->execute(
             'DELETE FROM `' . _DB_PREFIX_ . 'shopvote_review_answer`
              WHERE id_shop = ' . (int) $shopId . '
              AND review_id IN (' . implode(',', $reviewIdsQuoted) . ')'
-        );
+        )) {
+            return 0;
+        }
 
         // Delete reviews
-        Db::getInstance()->execute(
+        if (!Db::getInstance()->execute(
             'DELETE FROM `' . _DB_PREFIX_ . 'shopvote_review`
              WHERE id_shop = ' . (int) $shopId . '
-             AND fetched_at < \'' . pSQL($cutoffDate) . '\''
-        );
+             AND last_seen_at < \'' . pSQL($cutoffDate) . '\''
+        )) {
+            return 0;
+        }
 
         return Db::getInstance()->Affected_Rows();
     }
@@ -258,9 +349,7 @@ class ReviewRepository
     {
         $shopId = $shopId ?? (int) Context::getContext()->shop->id;
 
-        Db::getInstance()->delete('shopvote_review_answer', 'id_shop = ' . (int) $shopId);
-        Db::getInstance()->delete('shopvote_review', 'id_shop = ' . (int) $shopId);
-
-        return true;
+        return Db::getInstance()->delete('shopvote_review_answer', 'id_shop = ' . (int) $shopId)
+            && Db::getInstance()->delete('shopvote_review', 'id_shop = ' . (int) $shopId);
     }
 }

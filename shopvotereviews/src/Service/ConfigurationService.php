@@ -14,6 +14,13 @@ use ShopVoteReviews;
 
 class ConfigurationService
 {
+    private EasyReviewsSnippetParser $easyReviewsSnippetParser;
+
+    public function __construct(EasyReviewsSnippetParser $easyReviewsSnippetParser)
+    {
+        $this->easyReviewsSnippetParser = $easyReviewsSnippetParser;
+    }
+
     /**
      * Get all configuration values
      */
@@ -25,7 +32,7 @@ class ConfigurationService
             $value = Configuration::get($configKey);
 
             // Mask sensitive values
-            if ($key === 'API_KEY' && !empty($value)) {
+            if (in_array($key, ['API_KEY', 'EASYREVIEWS_TOKEN'], true) && !empty($value)) {
                 $config[$key] = ShopVoteReviews::maskApiKey($value);
                 $config[$key . '_SET'] = true;
             } elseif ($key === 'CRON_TOKEN' && !empty($value)) {
@@ -79,10 +86,28 @@ class ConfigurationService
                 continue;
             }
 
-            Configuration::updateValue($configKey, $value);
+            if (!Configuration::updateValue($configKey, $value)) {
+                $errors[$key] = 'The setting could not be saved.';
+            }
         }
 
         return $errors;
+    }
+
+    public function importEasyReviewsSnippet(string $snippet): void
+    {
+        $parsed = $this->easyReviewsSnippetParser->parse($snippet);
+
+        $saved = Configuration::updateValue(ShopVoteReviews::CONFIG_KEYS['EASYREVIEWS_SCRIPT_URL'], $parsed['script_url'])
+            && Configuration::updateValue(ShopVoteReviews::CONFIG_KEYS['EASYREVIEWS_TOKEN'], $parsed['token'])
+            && Configuration::updateValue(
+            ShopVoteReviews::CONFIG_KEYS['EASYREVIEWS_OPTIONS'],
+            json_encode($parsed['options'], JSON_UNESCAPED_SLASHES)
+        );
+
+        if (!$saved) {
+            throw new \RuntimeException('The EasyReviews settings could not be saved.');
+        }
     }
 
     /**
@@ -92,8 +117,14 @@ class ConfigurationService
     {
         switch ($key) {
             case 'SHOP_ID':
-                if (!empty($value) && !preg_match('/^[a-zA-Z0-9_-]+$/', $value)) {
+                if (!empty($value) && (strlen((string) $value) > 64 || !preg_match('/^[a-zA-Z0-9_-]+$/', $value))) {
                     return 'Shop ID contains invalid characters.';
+                }
+                break;
+
+            case 'API_KEY':
+                if (!empty($value) && (strlen((string) $value) > 256 || preg_match('/[\x00-\x1F\x7F]/', (string) $value))) {
+                    return 'API key contains invalid characters.';
                 }
                 break;
 

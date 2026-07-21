@@ -13,5 +13,6 @@ services:
       - '@shopvote.repository.shop_summary'
       - '@shopvote.repository.review'
       - '@shopvote.repository.sync_log'
+      - '@shopvote.repository.metrics'
     tags:
       - { name: controller.service_arguments }

@@ -24,10 +24,14 @@ class Installer
     /** @var array Hooks to register */
     private const HOOKS = [
         'displayHeader',
+        'displayNav1',
         'displayFooter',
         'displayHome',
         'displayLeftColumn',
         'displayRightColumn',
+        'displayProductAdditionalInfo',
+        'displayCheckoutSummaryTop',
+        'displayOrderConfirmation',
         'actionFrontControllerSetMedia',
         'moduleRoutes',
     ];
@@ -50,9 +54,19 @@ class Installer
         'LAST_FETCH_STATUS' => '',
         'LAST_ERROR' => '',
         'LAST_ERROR_TIME' => '',
-        'ENABLE_JSONLD' => true,
+        'ENABLE_JSONLD' => false,
         'DISPLAY_HEADER' => false,
         'DISPLAY_FOOTER' => true,
+        'DISPLAY_HOME' => true,
+        'DISPLAY_SIDEBAR' => true,
+        'DISPLAY_PRODUCT' => false,
+        'DISPLAY_CHECKOUT' => false,
+        'EASYREVIEWS_ENABLED' => false,
+        'EASYREVIEWS_SCRIPT_URL' => '',
+        'EASYREVIEWS_TOKEN' => '',
+        'EASYREVIEWS_OPTIONS' => '{}',
+        'PRODUCT_REVIEWS_ENABLED' => false,
+        'EVENT_SECRET' => '',
     ];
 
     public function __construct(ShopVoteReviews $module)
@@ -123,11 +137,14 @@ class Installer
             `review_text` TEXT DEFAULT NULL,
             `is_verified` TINYINT(1) UNSIGNED DEFAULT 0,
             `fetched_at` DATETIME NOT NULL,
+            `first_seen_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `last_seen_at` DATETIME NOT NULL,
             `id_shop` INT(11) UNSIGNED NOT NULL DEFAULT 1,
             PRIMARY KEY (`id_review`),
             UNIQUE KEY `uk_review_id_shop` (`review_id`, `id_shop`),
             INDEX `idx_review_date` (`review_date`),
             INDEX `idx_fetched_at` (`fetched_at`),
+            INDEX `idx_last_seen_at` (`last_seen_at`),
             INDEX `idx_id_shop` (`id_shop`)
         ) ENGINE=' . _MYSQL_ENGINE_ . ' DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;';
 
@@ -141,7 +158,8 @@ class Installer
             `id_shop` INT(11) UNSIGNED NOT NULL DEFAULT 1,
             PRIMARY KEY (`id_answer`),
             INDEX `idx_review_id` (`review_id`),
-            INDEX `idx_id_shop` (`id_shop`)
+            INDEX `idx_id_shop` (`id_shop`),
+            INDEX `idx_review_shop` (`review_id`, `id_shop`)
         ) ENGINE=' . _MYSQL_ENGINE_ . ' DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;';
 
         // Sync logs table
@@ -170,6 +188,19 @@ class Installer
             UNIQUE KEY `uk_lock_key_shop` (`lock_key`, `id_shop`)
         ) ENGINE=' . _MYSQL_ENGINE_ . ' DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;';
 
+        // Aggregate, PII-free daily metrics
+        $sql[] = 'CREATE TABLE IF NOT EXISTS `' . _DB_PREFIX_ . 'shopvote_metric_daily` (
+            `id_metric` INT(11) UNSIGNED NOT NULL AUTO_INCREMENT,
+            `metric_date` DATE NOT NULL,
+            `event_name` VARCHAR(32) NOT NULL,
+            `placement` VARCHAR(32) NOT NULL,
+            `event_count` INT(11) UNSIGNED NOT NULL DEFAULT 0,
+            `id_shop` INT(11) UNSIGNED NOT NULL DEFAULT 1,
+            PRIMARY KEY (`id_metric`),
+            UNIQUE KEY `uk_metric_shop_date_event_placement` (`id_shop`, `metric_date`, `event_name`, `placement`),
+            INDEX `idx_metric_date` (`metric_date`)
+        ) ENGINE=' . _MYSQL_ENGINE_ . ' DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;';
+
         foreach ($sql as $query) {
             if (!Db::getInstance()->execute($query)) {
                 return false;
@@ -190,6 +221,7 @@ class Installer
             'shopvote_review_answer',
             'shopvote_sync_log',
             'shopvote_sync_lock',
+            'shopvote_metric_daily',
         ];
 
         foreach ($tables as $table) {
@@ -225,7 +257,7 @@ class Installer
             }
 
             // Generate cron token on install
-            if ($key === 'CRON_TOKEN') {
+            if ($key === 'CRON_TOKEN' || $key === 'EVENT_SECRET') {
                 $value = ShopVoteReviews::generateCronToken();
             }
 

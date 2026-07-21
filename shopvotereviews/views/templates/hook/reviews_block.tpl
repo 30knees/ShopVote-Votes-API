@@ -4,7 +4,13 @@
  *}
 
 {if $shopvote_has_data}
-<section class="shopvote-reviews-block">
+<section class="shopvote-reviews-block"
+         data-shopvote-metric-endpoint="{$shopvote_metric_endpoint|escape:'htmlall':'UTF-8'}"
+         data-shopvote-placement="{$shopvote_placement|escape:'htmlall':'UTF-8'}"
+         data-shopvote-metric-expires="{$shopvote_metric_expires|intval}"
+         data-shopvote-metric-shop="{$shopvote_metric_shop_id|intval}"
+         data-shopvote-view-signature="{$shopvote_view_signature|escape:'htmlall':'UTF-8'}"
+         data-shopvote-click-signature="{$shopvote_click_signature|escape:'htmlall':'UTF-8'}">
     <div class="shopvote-reviews-header">
         <h2 class="shopvote-reviews-title">{l s='What Our Customers Say' d='Modules.Shopvotereviews.Shop'}</h2>
 
@@ -25,20 +31,20 @@
     {if $shopvote_reviews|count > 0}
     <div class="shopvote-reviews-list">
         {foreach from=$shopvote_reviews item=review}
-        <div class="shopvote-review-item{if $review.is_verified} shopvote-verified{/if}">
+        <article class="shopvote-review-item{if $review.is_verified} shopvote-verified{/if}">
             <div class="shopvote-review-header">
-                <div class="shopvote-review-rating">
+                <div class="shopvote-review-rating" role="img" aria-label="{l s='Rating: %rating% out of 5 stars' sprintf=['%rating%' => $review.review_rating_stars|number_format:1:'.':''] d='Modules.Shopvotereviews.Shop'}">
                     {for $i=1 to 5}
                         {if $i <= $review.review_rating_stars}
-                        <span class="shopvote-star shopvote-star-full">★</span>
+                        <span class="shopvote-star shopvote-star-full" aria-hidden="true">★</span>
                         {else}
-                        <span class="shopvote-star shopvote-star-empty">☆</span>
+                        <span class="shopvote-star shopvote-star-empty" aria-hidden="true">☆</span>
                         {/if}
                     {/for}
                 </div>
 
                 <div class="shopvote-review-meta">
-                    {if $shopvote_show_reviewer_name && $review.reviewer}
+                    {if $review.reviewer}
                     <span class="shopvote-reviewer">{$review.reviewer|escape:'htmlall':'UTF-8'}</span>
                     {/if}
 
@@ -47,7 +53,7 @@
                     {/if}
 
                     {if $review.is_verified}
-                    <span class="shopvote-verified-badge" title="{l s='Verified Purchase' d='Modules.Shopvotereviews.Shop'}">✓</span>
+                    <span class="shopvote-verified-badge">✓ {l s='Verified purchase' d='Modules.Shopvotereviews.Shop'}</span>
                     {/if}
                 </div>
             </div>
@@ -55,10 +61,11 @@
             {if $review.review_text_excerpt}
             <div class="shopvote-review-text">
                 <p>{$review.review_text_excerpt|escape:'htmlall':'UTF-8'}</p>
-                {if $review.has_more && $review.review_url}
-                <a href="{$review.review_url|escape:'htmlall':'UTF-8'}" target="_blank" rel="noopener noreferrer" class="shopvote-read-more">
-                    {l s='Read more' d='Modules.Shopvotereviews.Shop'} →
-                </a>
+                {if $review.has_more}
+                <details class="shopvote-review-details">
+                    <summary>{l s='Read full review' d='Modules.Shopvotereviews.Shop'}</summary>
+                    <p>{$review.review_text|escape:'htmlall':'UTF-8'}</p>
+                </details>
                 {/if}
             </div>
             {/if}
@@ -86,7 +93,7 @@
                 {/foreach}
             </div>
             {/if}
-        </div>
+        </article>
         {/foreach}
     </div>
     {else}
@@ -96,9 +103,14 @@
     {/if}
 
     <div class="shopvote-reviews-footer">
+        {if $shopvote_placement != 'reviews_page'}
+            <a href="{$shopvote_reviews_url|escape:'htmlall':'UTF-8'}" class="shopvote-view-all btn btn-primary">
+                {l s='Latest customer reviews' d='Modules.Shopvotereviews.Shop'}
+            </a>
+        {/if}
         {if $shopvote_profile_url}
-        <a href="{$shopvote_profile_url|escape:'htmlall':'UTF-8'}" target="_blank" rel="noopener noreferrer" class="shopvote-view-all btn btn-primary">
-            {l s='View all reviews on ShopVote' d='Modules.Shopvotereviews.Shop'}
+        <a href="{$shopvote_profile_url|escape:'htmlall':'UTF-8'}" target="_blank" rel="noopener noreferrer" class="shopvote-source-link" data-shopvote-profile-click>
+            {l s='View verified source on ShopVote' d='Modules.Shopvotereviews.Shop'}
         </a>
         {/if}
         <div class="shopvote-attribution">{$shopvote_attribution|escape:'htmlall':'UTF-8'}</div>

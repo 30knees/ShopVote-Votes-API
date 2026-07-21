@@ -7,11 +7,14 @@ A PrestaShop 8.2.x module that integrates with the ShopVote VotesAPI to display 
 - Fetch and display ShopVote shop ratings and statistics
 - Show the latest customer reviews (up to 25)
 - Display shop responses to reviews
-- Configurable widgets for header, footer, sidebar, and homepage
-- JSON-LD structured data output for SEO (AggregateRating)
+- Configurable widgets for header navigation, footer, homepage, sidebar, product, and checkout placements
+- Dedicated local page for the latest 25 reviews
+- Optional EasyReviews and product-review collection on order confirmation
+- Aggregate, PII-free conversion and review-health reporting
+- Optional advanced JSON-LD output limited to the dedicated reviews page
 - Automatic and manual sync options
 - GDPR-compliant privacy settings (anonymize reviewer names)
-- Secure cron endpoint with token authentication
+- Secure cron endpoint with bearer-token POST authentication
 - Concurrent execution prevention (mutex locking)
 - Detailed sync logging and status monitoring
 
@@ -19,7 +22,7 @@ A PrestaShop 8.2.x module that integrates with the ShopVote VotesAPI to display 
 
 - PrestaShop 8.0.0 - 8.99.99
 - PHP 8.1 or higher
-- PHP extensions: `simplexml`, `dom`, `json`, `curl`
+- PHP extensions: `simplexml`, `dom`, `json`, `curl`, `mbstring`
 - ShopVote account with VotesAPI access
 
 ## Installation
@@ -65,9 +68,14 @@ composer require shopvote/shopvote-reviews
 | **Show Reviewer Name** | Show full name or anonymize (GDPR) |
 | **Review Excerpt Length** | Max characters to display (0 = full text) |
 | **Show Shop Responses** | Display responses to reviews |
-| **Display in Header** | Show rating snippet in header |
+| **Display in Header Navigation** | Show rating snippet in `displayNav1` |
 | **Display in Footer** | Show rating badge in footer |
-| **Enable JSON-LD** | Output structured data for search engines |
+| **Homepage / Sidebar / Product / Checkout** | Toggle each placement independently |
+| **Advanced Structured Data** | Optional output on the dedicated reviews page; self-serving organization ratings are not eligible for Google review rich results |
+
+### Optional EasyReviews
+
+Paste the code supplied in the ShopVote merchant area into **Import ShopVote code**. The raw snippet is discarded; only its validated HTTPS ShopVote script URL, token, and supported options are stored. Enable product-review collection only when the corresponding ShopVote entitlement is active. Review requests are never gated by customer satisfaction.
 
 ### Data Retention
 
@@ -80,34 +88,27 @@ composer require shopvote/shopvote-reviews
 
 For automatic synchronization, set up a cron job to call the sync endpoint.
 
-### Cron URL
+### Preferred authenticated request
 
-The cron URL is displayed in the module configuration page. It includes a security token that must be provided.
-
-```
-https://your-shop.com/module/shopvotereviews/cron?token=YOUR_TOKEN
-```
+The endpoint and token are displayed on the configuration page. Use POST so the secret does not enter URL logs.
 
 ### Example Crontab Entries
 
 **Every 15 minutes (recommended):**
 ```bash
-*/15 * * * * curl -s "https://your-shop.com/module/shopvotereviews/cron?token=YOUR_TOKEN" > /dev/null 2>&1
+*/15 * * * * curl -sS -X POST -H "Authorization: Bearer YOUR_TOKEN" "https://your-shop.com/module/shopvotereviews/cron" > /dev/null 2>&1
 ```
 
 **Every hour:**
 ```bash
-0 * * * * curl -s "https://your-shop.com/module/shopvotereviews/cron?token=YOUR_TOKEN" > /dev/null 2>&1
+0 * * * * curl -sS -X POST -H "Authorization: Bearer YOUR_TOKEN" "https://your-shop.com/module/shopvotereviews/cron" > /dev/null 2>&1
 ```
 
-**Using wget:**
-```bash
-*/15 * * * * wget -q -O /dev/null "https://your-shop.com/module/shopvotereviews/cron?token=YOUR_TOKEN"
-```
+Query-token GET requests remain available only as a deprecated 1.1 compatibility interface.
 
 ### Token Rotation
 
-For security, you can rotate the cron token at any time from the configuration page. After rotation, update your crontab with the new URL.
+For security, you can rotate the cron token at any time from the configuration page. After rotation, update the bearer token in your crontab.
 
 ## Hooks
 
@@ -115,11 +116,15 @@ The module registers the following PrestaShop hooks:
 
 | Hook | Usage |
 |------|-------|
-| `displayHeader` | Rating snippet + JSON-LD structured data |
+| `displayHeader` | Optional JSON-LD on the dedicated reviews page only |
+| `displayNav1` | Compact header-navigation shop rating |
 | `displayFooter` | Rating badge widget |
 | `displayHome` | Reviews block on homepage |
 | `displayLeftColumn` | Rating sidebar widget |
 | `displayRightColumn` | Rating sidebar widget |
+| `displayProductAdditionalInfo` | Clearly labelled “Shop rating” |
+| `displayCheckoutSummaryTop` | Checkout trust rating |
+| `displayOrderConfirmation` | Optional EasyReviews consent prompt |
 | `actionFrontControllerSetMedia` | CSS registration |
 
 ## Widget Integration
@@ -261,6 +266,12 @@ For issues and feature requests, please open an issue on GitHub.
 MIT License - see LICENSE file for details.
 
 ## Changelog
+
+### 1.1.0
+
+- Added admin permission/CSRF enforcement, URL/XML/API hardening, authenticated POST cron, and transactional partial-safe sync
+- Added independent trust placements, a dedicated reviews page, accessibility improvements, EasyReviews import, product-review payloads, and aggregate growth reporting
+- Added first/last-seen review timestamps, atomic upserts, batched answers, and a conservative 1.0-to-1.1 upgrade
 
 ### 1.0.0
 

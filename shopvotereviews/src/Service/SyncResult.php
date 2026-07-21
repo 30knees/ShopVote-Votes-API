@@ -26,6 +26,18 @@ class SyncResult
     /** @var bool Whether another sync is in progress */
     public bool $locked = false;
 
+    /** @var bool Whether some requested components synced successfully */
+    public bool $partial = false;
+
+    /** @var string[] Non-fatal component warnings */
+    public array $warnings = [];
+
+    /** @var array<string, string> Per-component status */
+    public array $components = [
+        'summary' => 'not_requested',
+        'reviews' => 'not_requested',
+    ];
+
     /** @var bool Whether we should try fallback methods */
     public bool $shouldFallback = false;
 
@@ -46,6 +58,9 @@ class SyncResult
             'http_code' => $this->httpCode,
             'skipped' => $this->skipped,
             'locked' => $this->locked,
+            'partial' => $this->partial,
+            'warnings' => $this->warnings,
+            'components' => $this->components,
             'has_summary' => $this->hasSummary,
             'reviews_updated' => $this->reviewsUpdated,
         ];

@@ -14,6 +14,9 @@ services:
   shopvote.api.xml_parser:
     class: ShopVote\ShopVoteReviews\Api\XmlParser
 
+  shopvote.service.easyreviews_parser:
+    class: ShopVote\ShopVoteReviews\Service\EasyReviewsSnippetParser
+
   # Repositories
   shopvote.repository.shop_summary:
     class: ShopVote\ShopVoteReviews\Repository\ShopSummaryRepository
@@ -27,6 +30,9 @@ services:
   shopvote.repository.sync_lock:
     class: ShopVote\ShopVoteReviews\Repository\SyncLockRepository
 
+  shopvote.repository.metrics:
+    class: ShopVote\ShopVoteReviews\Repository\MetricsRepository
+
   # Sync Service
   shopvote.service.sync:
     class: ShopVote\ShopVoteReviews\Service\SyncService
@@ -37,7 +43,10 @@ services:
       - '@shopvote.repository.review'
       - '@shopvote.repository.sync_log'
       - '@shopvote.repository.sync_lock'
+      - '@shopvote.repository.metrics'
 
   # Configuration Service
   shopvote.service.configuration:
     class: ShopVote\ShopVoteReviews\Service\ConfigurationService
+    arguments:
+      - '@shopvote.service.easyreviews_parser'

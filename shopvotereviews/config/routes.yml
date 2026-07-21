@@ -1,11 +1,18 @@
 # Admin routes
 shopvote_admin_configuration:
   path: /shopvote/configuration
-  methods: [GET, POST]
+  methods: [GET]
   defaults:
     _controller: 'ShopVote\ShopVoteReviews\Controller\Admin\ConfigurationController::index'
     _legacy_controller: AdminShopVoteReviews
     _legacy_link: AdminShopVoteReviews
+
+shopvote_admin_configuration_save:
+  path: /shopvote/configuration
+  methods: [POST]
+  defaults:
+    _controller: 'ShopVote\ShopVoteReviews\Controller\Admin\ConfigurationController::save'
+    _legacy_controller: AdminShopVoteReviews
 
 shopvote_admin_fetch:
   path: /shopvote/fetch
