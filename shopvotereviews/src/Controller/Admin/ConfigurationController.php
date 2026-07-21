@@ -205,12 +205,12 @@ class ConfigurationController extends FrameworkBundleAdminController
             ], 403);
         }
 
-        $this->syncService->purgeAllData();
+        $success = $this->syncService->purgeAllData();
 
         return new JsonResponse([
-            'success' => true,
-            'message' => 'All data has been purged.',
-        ]);
+            'success' => $success,
+            'message' => $success ? 'All data has been purged.' : 'The data could not be purged.',
+        ], $success ? 200 : 500);
     }
 
     /**

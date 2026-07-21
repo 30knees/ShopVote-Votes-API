@@ -431,7 +431,7 @@ class SyncService
                     if ($affectedReviews < 0) {
                         throw new \RuntimeException('Could not save review ' . ($review->reviewId ?? 'unknown') . '.');
                     }
-                    $result->reviewsUpdated += $affectedReviews;
+                    $result->reviewsUpdated++;
 
                     if ($affectedReviews === 1) {
                         if (!$this->metricsRepository->increment('new_review', 'sync')

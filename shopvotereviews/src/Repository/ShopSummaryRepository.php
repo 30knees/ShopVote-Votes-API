@@ -28,7 +28,6 @@ class ShopSummaryRepository
         $sql->from('shopvote_shop_summary');
         $sql->where('id_shop = ' . (int) $shopId);
         $sql->orderBy('fetched_at DESC');
-        $sql->limit(1);
 
         $result = Db::getInstance()->getRow($sql);
 

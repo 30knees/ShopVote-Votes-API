@@ -12,7 +12,11 @@ function upgrade_module_1_1_0($module): bool
     $db = Db::getInstance();
     $reviewTable = _DB_PREFIX_ . 'shopvote_review';
 
-    if (!$db->getValue("SHOW COLUMNS FROM `{$reviewTable}` LIKE 'first_seen_at'")) {
+    $reviewColumns = $db->executeS("SHOW COLUMNS FROM `{$reviewTable}` LIKE 'first_seen_at'");
+    if ($reviewColumns === false) {
+        return false;
+    }
+    if ($reviewColumns === []) {
         if (!$db->execute("ALTER TABLE `{$reviewTable}` ADD `first_seen_at` DATETIME DEFAULT NULL AFTER `fetched_at`, ADD `last_seen_at` DATETIME DEFAULT NULL AFTER `first_seen_at`")) {
             return false;
         }
@@ -25,7 +29,11 @@ function upgrade_module_1_1_0($module): bool
     }
 
     $answerTable = _DB_PREFIX_ . 'shopvote_review_answer';
-    if (!$db->getValue("SHOW INDEX FROM `{$answerTable}` WHERE Key_name = 'idx_review_shop'")) {
+    $answerIndexes = $db->executeS("SHOW INDEX FROM `{$answerTable}` WHERE Key_name = 'idx_review_shop'");
+    if ($answerIndexes === false) {
+        return false;
+    }
+    if ($answerIndexes === []) {
         if (!$db->execute("ALTER TABLE `{$answerTable}` ADD INDEX `idx_review_shop` (`review_id`, `id_shop`)")) {
             return false;
         }

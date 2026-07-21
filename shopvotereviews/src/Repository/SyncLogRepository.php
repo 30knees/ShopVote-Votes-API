@@ -96,7 +96,6 @@ class SyncLogRepository
         $sql->where('id_shop = ' . (int) $shopId);
         $sql->where('status = \'success\'');
         $sql->orderBy('sync_time DESC');
-        $sql->limit(1);
 
         $result = Db::getInstance()->getRow($sql);
 
@@ -116,7 +115,6 @@ class SyncLogRepository
         $sql->where('id_shop = ' . (int) $shopId);
         $sql->where('status = \'error\'');
         $sql->orderBy('sync_time DESC');
-        $sql->limit(1);
 
         $result = Db::getInstance()->getRow($sql);
 

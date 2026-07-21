@@ -501,7 +501,7 @@ class ShopVoteReviews extends Module implements WidgetInterface
             'shopvote_reviews' => $processedReviews,
             'shopvote_show_reviewer_name' => $showReviewerName,
             'shopvote_show_responses' => $showResponses,
-            'shopvote_has_data' => !empty($summary),
+            'shopvote_has_data' => !empty($summary) || !empty($processedReviews),
             'shopvote_stars_html' => $this->generateStarsHtml($summary['rating_value_stars'] ?? 0),
             'shopvote_profile_url' => $profileUrl,
             'shopvote_reviews_url' => $this->context->link->getModuleLink($this->name, 'reviews', [], true),
