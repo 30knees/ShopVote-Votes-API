@@ -75,7 +75,7 @@ composer require shopvote/shopvote-reviews
 
 ### Optional EasyReviews
 
-Paste the code supplied in the ShopVote merchant area into **Import ShopVote code**. The raw snippet is discarded; only its validated HTTPS ShopVote script URL, token, and supported options are stored. Enable product-review collection only when the corresponding ShopVote entitlement is active. Review requests are never gated by customer satisfaction.
+Paste the complete EasyReviews HTML/JavaScript snippet supplied in the ShopVote merchant area, including its `<script>` tags, into **Import EasyReviews HTML/JavaScript snippet**. The raw snippet is discarded; only its validated HTTPS ShopVote script URL, token, and supported options are stored. Enable product-review collection only when the corresponding ShopVote entitlement is active. Review requests are never gated by customer satisfaction.
 
 ### Data Retention
 

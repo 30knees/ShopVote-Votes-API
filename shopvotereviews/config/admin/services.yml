@@ -14,5 +14,6 @@ services:
       - '@shopvote.repository.review'
       - '@shopvote.repository.sync_log'
       - '@shopvote.repository.metrics'
+      - '@translator'
     tags:
       - { name: controller.service_arguments }

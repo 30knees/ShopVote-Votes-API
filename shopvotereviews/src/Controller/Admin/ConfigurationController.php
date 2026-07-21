@@ -14,6 +14,7 @@ use PrestaShopBundle\Security\Annotation\AdminSecurity;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Contracts\Translation\TranslatorInterface;
 use ShopVote\ShopVoteReviews\Service\SyncService;
 use ShopVote\ShopVoteReviews\Service\ConfigurationService;
 use ShopVote\ShopVoteReviews\Repository\ShopSummaryRepository;
@@ -42,13 +43,17 @@ class ConfigurationController extends FrameworkBundleAdminController
     /** @var MetricsRepository */
     private $metricsRepository;
 
+    /** @var TranslatorInterface */
+    private $translator;
+
     public function __construct(
         SyncService $syncService,
         ConfigurationService $configurationService,
         ShopSummaryRepository $summaryRepository,
         ReviewRepository $reviewRepository,
         SyncLogRepository $syncLogRepository,
-        MetricsRepository $metricsRepository
+        MetricsRepository $metricsRepository,
+        TranslatorInterface $translator
     ) {
         $this->syncService = $syncService;
         $this->configurationService = $configurationService;
@@ -56,6 +61,7 @@ class ConfigurationController extends FrameworkBundleAdminController
         $this->reviewRepository = $reviewRepository;
         $this->syncLogRepository = $syncLogRepository;
         $this->metricsRepository = $metricsRepository;
+        $this->translator = $translator;
     }
 
     /**
@@ -76,7 +82,7 @@ class ConfigurationController extends FrameworkBundleAdminController
     public function save(Request $request): Response
     {
         if (!$this->isCsrfTokenValid('shopvote_configuration', $request->request->get('_token'))) {
-            $this->addFlash('error', $this->trans('Invalid security token. Please refresh the page.', 'Modules.Shopvotereviews.Admin'));
+            $this->addFlash('error', $this->translator->trans('Invalid security token. Please refresh the page.', [], 'Modules.Shopvotereviews.Admin'));
 
             return $this->redirectToRoute('shopvote_admin_configuration');
         }
@@ -116,7 +122,7 @@ class ConfigurationController extends FrameworkBundleAdminController
         }
 
         if (empty($errors)) {
-            $this->addFlash('success', $this->trans('Settings saved successfully.', 'Modules.Shopvotereviews.Admin'));
+            $this->addFlash('success', $this->translator->trans('Settings saved successfully.', [], 'Modules.Shopvotereviews.Admin'));
         } else {
             foreach ($errors as $field => $error) {
                 $this->addFlash('error', "{$field}: {$error}");
