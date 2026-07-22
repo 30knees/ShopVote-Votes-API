@@ -41,12 +41,24 @@ if [ -d "$STAGE/vendor/nikic" ] || grep -q 'PhpParser' "$STAGE/vendor/composer/a
     exit 1
 fi
 
+# Zip with a tool that writes forward-slash entry names (zip spec).
+# NEVER use PowerShell's Compress-Archive here: it writes backslash
+# separators and PrestaShop's module uploader rejects the zip.
 rm -f "$OUT"
 if command -v zip >/dev/null 2>&1; then
     (cd "$(dirname "$STAGE")" && zip -rq "$OUT" "$MODULE")
+elif [ -x /c/Windows/System32/tar.exe ]; then
+    /c/Windows/System32/tar.exe -a -cf "$(cygpath -w "$OUT")" \
+        -C "$(cygpath -w "$(dirname "$STAGE")")" "$MODULE"
 else
-    powershell.exe -NoProfile -Command \
-        "Compress-Archive -Path '$(cygpath -w "$STAGE")' -DestinationPath '$(cygpath -w "$OUT")' -Force"
+    echo "ERROR: need 'zip' or Windows bsdtar to build the archive" >&2
+    exit 1
+fi
+
+# Guard: no backslash entry names may survive.
+if unzip -l "$OUT" | grep -q '\\'; then
+    echo "ERROR: zip contains backslash path separators" >&2
+    exit 1
 fi
 
 # Restore the dev vendor so local test runs keep working.
