@@ -566,7 +566,10 @@ class ShopVoteReviews extends Module implements WidgetInterface
                 if ($lastSpace !== false && $lastSpace >= (int) floor($excerptLength * 0.6)) {
                     $excerpt = mb_substr($excerpt, 0, $lastSpace);
                 }
-                $processedReview['review_text_excerpt'] = rtrim($excerpt, " \u{00A0}.,;:!-") . '…';
+                // rtrim() is byte-oriented and would corrupt multi-byte characters
+                // sharing bytes with the charlist (e.g. "à" vs NBSP), so trim codepoints.
+                $excerpt = (string) preg_replace('/[\s\x{00A0}.,;:!-]+$/u', '', $excerpt);
+                $processedReview['review_text_excerpt'] = $excerpt . '…';
                 $processedReview['has_more'] = true;
             } else {
                 $processedReview['review_text_excerpt'] = $reviewText;

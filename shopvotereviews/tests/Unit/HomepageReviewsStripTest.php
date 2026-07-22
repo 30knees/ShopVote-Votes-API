@@ -18,6 +18,10 @@ class HomepageReviewsStripTest extends TestCase
 
         $this->assertIsString($module);
         $this->assertStringContainsString("renderWidget('reviews_strip'", $module);
+        // Excerpt trimming must be codepoint-safe: byte-oriented rtrim() corrupts
+        // UTF-8 when the charlist shares bytes with multi-byte characters.
+        $this->assertStringContainsString('preg_replace(\'/[\s\x{00A0}.,;:!-]+$/u\'', $module);
+        $this->assertStringNotContainsString('rtrim($excerpt', $module);
         $this->assertStringContainsString("'reviews_strip' => 'views/templates/hook/reviews_strip.tpl'", $module);
         $this->assertStringContainsString('HomepageReviewSelector::select', $module);
         $this->assertIsString($installer);
