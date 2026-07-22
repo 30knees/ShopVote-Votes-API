@@ -80,7 +80,7 @@ class ShopVoteReviews extends Module implements WidgetInterface
     {
         $this->name = 'shopvotereviews';
         $this->tab = 'advertising_marketing';
-        $this->version = '1.3.0';
+        $this->version = '1.3.1';
         $this->author = 'ShopVote Integration';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = [
@@ -250,8 +250,8 @@ class ShopVoteReviews extends Module implements WidgetInterface
         return $this->renderWidget('reviews_strip', [
             'placement' => 'homepage',
             'limit' => 25,
-            'display_limit' => 2,
-            'excerpt_length' => 160,
+            'display_limit' => 3,
+            'excerpt_length' => 140,
         ]);
     }
 
@@ -507,7 +507,7 @@ class ShopVoteReviews extends Module implements WidgetInterface
                 ? max(40, min(240, (int) $configuration['excerpt_length']))
                 : ConfigurationValue::integer($configuredExcerptLength, 200));
         $displayLimit = $isHomepageStrip
-            ? max(1, min(2, (int) ($configuration['display_limit'] ?? 2)))
+            ? max(1, min(3, (int) ($configuration['display_limit'] ?? 3)))
             : $reviewsToShow;
         $showResponses = !$isHomepageStrip
             && (bool) Configuration::get(self::CONFIG_KEYS['SHOW_RESPONSES']);
@@ -561,7 +561,15 @@ class ShopVoteReviews extends Module implements WidgetInterface
 
             $reviewText = $review['review_text'] ?? '';
             if ($excerptLength > 0 && mb_strlen($reviewText) > $excerptLength) {
-                $processedReview['review_text_excerpt'] = mb_substr($reviewText, 0, $excerptLength) . '...';
+                $excerpt = mb_substr($reviewText, 0, $excerptLength);
+                $lastSpace = mb_strrpos($excerpt, ' ');
+                if ($lastSpace !== false && $lastSpace >= (int) floor($excerptLength * 0.6)) {
+                    $excerpt = mb_substr($excerpt, 0, $lastSpace);
+                }
+                // rtrim() is byte-oriented and would corrupt multi-byte characters
+                // sharing bytes with the charlist (e.g. "à" vs NBSP), so trim codepoints.
+                $excerpt = (string) preg_replace('/[\s\x{00A0}.,;:!-]+$/u', '', $excerpt);
+                $processedReview['review_text_excerpt'] = $excerpt . '…';
                 $processedReview['has_more'] = true;
             } else {
                 $processedReview['review_text_excerpt'] = $reviewText;

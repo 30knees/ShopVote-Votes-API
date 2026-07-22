@@ -30,6 +30,7 @@ class HomepageReviewSelector
                 'review' => $review,
                 'position' => $position,
                 'verified' => !empty($review['is_verified']),
+                'named' => self::hasRealName((string) ($review['reviewer'] ?? '')),
                 'key' => mb_strtolower($text, 'UTF-8'),
             ];
         }
@@ -37,6 +38,10 @@ class HomepageReviewSelector
         usort($candidates, static function (array $left, array $right): int {
             if ($left['verified'] !== $right['verified']) {
                 return $left['verified'] ? -1 : 1;
+            }
+
+            if ($left['named'] !== $right['named']) {
+                return $left['named'] ? -1 : 1;
             }
 
             return $left['position'] <=> $right['position'];
@@ -57,6 +62,24 @@ class HomepageReviewSelector
         }
 
         return $selected;
+    }
+
+    /**
+     * ShopVote pseudonyms ("ShopVoter-519741", "Kunde-516380") and anonymized
+     * placeholders carry less social proof than a real reviewer name.
+     */
+    private static function hasRealName(string $reviewer): bool
+    {
+        $reviewer = trim($reviewer);
+        if ($reviewer === '') {
+            return false;
+        }
+
+        if (preg_match('/^\p{L}+[-_]\d+$/u', $reviewer)) {
+            return false;
+        }
+
+        return !in_array(mb_strtolower($reviewer, 'UTF-8'), ['anonymous', 'anonym'], true);
     }
 
     private static function normalizeText(string $text): string

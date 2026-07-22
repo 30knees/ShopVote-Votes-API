@@ -53,6 +53,34 @@ class HomepageReviewSelectorTest extends TestCase
         );
     }
 
+    public function testItPrefersNamedReviewersOverPseudonymsWithinSameVerificationTier(): void
+    {
+        $reviews = [
+            [
+                'review_id' => 'verified-pseudonym',
+                'reviewer' => 'ShopVoter-519741',
+                'review_text' => 'Schnelle Lieferung und alles bestens verpackt angekommen.',
+                'is_verified' => 1,
+            ],
+            [
+                'review_id' => 'verified-named',
+                'reviewer' => 'Gabriele M.',
+                'review_text' => 'Sehr freundlicher Kontakt und tolle Produktqualität.',
+                'is_verified' => 1,
+            ],
+            [
+                'review_id' => 'unverified-named',
+                'reviewer' => 'Peter Beispiel',
+                'review_text' => 'Gerne wieder, der Versand war wirklich schnell.',
+                'is_verified' => 0,
+            ],
+        ];
+
+        $selected = HomepageReviewSelector::select($reviews, 2);
+
+        $this->assertSame(['verified-named', 'verified-pseudonym'], array_column($selected, 'review_id'));
+    }
+
     public function testItFallsBackToNewestNonPlaceholderReviews(): void
     {
         $reviews = [

@@ -18,6 +18,10 @@ class HomepageReviewsStripTest extends TestCase
 
         $this->assertIsString($module);
         $this->assertStringContainsString("renderWidget('reviews_strip'", $module);
+        // Excerpt trimming must be codepoint-safe: byte-oriented rtrim() corrupts
+        // UTF-8 when the charlist shares bytes with multi-byte characters.
+        $this->assertStringContainsString('preg_replace(\'/[\s\x{00A0}.,;:!-]+$/u\'', $module);
+        $this->assertStringNotContainsString('rtrim($excerpt', $module);
         $this->assertStringContainsString("'reviews_strip' => 'views/templates/hook/reviews_strip.tpl'", $module);
         $this->assertStringContainsString('HomepageReviewSelector::select', $module);
         $this->assertIsString($installer);
@@ -44,7 +48,23 @@ class HomepageReviewsStripTest extends TestCase
         $this->assertStringContainsString('@media (min-width: 768px)', $stylesheet);
         $this->assertStringContainsString('@media (min-width: 1200px)', $stylesheet);
         $this->assertStringContainsString('@media (max-width: 767px)', $stylesheet);
-        $this->assertStringContainsString('.shopvote-home-strip-review:nth-child(n + 2)', $stylesheet);
         $this->assertStringContainsString('overflow-wrap: anywhere;', $stylesheet);
+        // Mobile shows a swipeable card row; tablet caps at two tiles, desktop restores the third.
+        $this->assertStringContainsString('scroll-snap-type: x mandatory;', $stylesheet);
+        $this->assertStringContainsString('.shopvote-home-strip-review:nth-child(n + 3)', $stylesheet);
+        $this->assertStringContainsString('grid-template-columns: repeat(3, minmax(0, 1fr));', $stylesheet);
+    }
+
+    public function testStripRendersTilesWithVerifiedBadgeAndDynamicCta(): void
+    {
+        $strip = file_get_contents(__DIR__ . '/../../views/templates/hook/reviews_strip.tpl');
+        $stylesheet = file_get_contents(__DIR__ . '/../../views/css/shopvote.css');
+
+        $this->assertIsString($strip);
+        $this->assertStringContainsString('shopvote-home-strip-review--verified', $strip);
+        $this->assertStringContainsString("Read all %count% reviews", $strip);
+        $this->assertIsString($stylesheet);
+        $this->assertStringContainsString('.shopvote-home-strip-review--verified', $stylesheet);
+        $this->assertStringContainsString('border-radius: 999px;', $stylesheet);
     }
 }

@@ -326,16 +326,22 @@
     text-align: center;
 }
 
-/* Compact Homepage Reviews Strip */
+/* Compact Homepage Reviews Strip (testimonial band with tiles) */
+.shopvote-home-strip,
+.shopvote-home-strip * {
+    box-sizing: border-box;
+}
+
 .shopvote-home-strip {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: 16px;
     width: 100%;
-    margin: 0 0 24px;
-    padding: 16px;
+    /* Top margin gives the band breathing room below the main menu. */
+    margin: 28px 0 36px;
+    padding: 18px;
     border: 1px solid #cbdcc7;
-    border-radius: 10px;
+    border-radius: 12px;
     background: #f4f8f1;
     color: #1f2b1f;
 }
@@ -353,7 +359,7 @@
 
 .shopvote-home-strip-title {
     margin: 0 0 6px;
-    font-size: 1rem;
+    font-size: 1.1rem;
     font-weight: 700;
     line-height: 1.25;
 }
@@ -385,22 +391,43 @@
     font-size: 0.78rem;
 }
 
+/* Mobile-first: swipeable card row with a peek of the next card. */
 .shopvote-home-strip-reviews {
     display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 14px;
+    grid-auto-flow: column;
+    grid-auto-columns: 86%;
+    gap: 12px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
 }
 
 .shopvote-home-strip-review {
-    padding-left: 13px;
-    border-left: 3px solid #84aa78;
+    display: flex;
+    flex-direction: column;
+    padding: 14px 16px;
+    background: #fff;
+    border: 1px solid #dde7d8;
+    border-radius: 10px;
+    box-shadow: 0 1px 2px rgba(31, 43, 31, 0.05);
+    scroll-snap-align: start;
+    transition: box-shadow 0.2s ease;
+}
+
+.shopvote-home-strip-review:hover {
+    box-shadow: 0 3px 10px rgba(31, 43, 31, 0.1);
+}
+
+.shopvote-home-strip-review--verified {
+    border-color: #9dc292;
 }
 
 .shopvote-home-strip-review-rating {
     display: flex;
     gap: 1px;
-    margin-bottom: 5px;
-    font-size: 0.82rem;
+    margin-bottom: 6px;
+    font-size: 0.85rem;
 }
 
 .shopvote-home-strip-quote {
@@ -416,7 +443,7 @@
     line-height: 1.42;
     overflow-wrap: anywhere;
     -webkit-box-orient: vertical;
-    -webkit-line-clamp: 3;
+    -webkit-line-clamp: 4;
 }
 
 .shopvote-home-strip-meta {
@@ -424,7 +451,9 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 4px 8px;
-    margin-top: 7px;
+    /* Pins the footer to the card bottom so tiles stay equal height. */
+    margin-top: auto;
+    padding-top: 9px;
     color: #536253;
     font-size: 0.72rem;
 }
@@ -441,7 +470,12 @@
 }
 
 .shopvote-home-strip-verified {
-    color: #237a31;
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: #e3f2e6;
+    color: #1f6b2c;
     font-weight: 600;
     white-space: nowrap;
 }
@@ -471,11 +505,8 @@
 @media (max-width: 767px) {
     .shopvote-home-strip {
         gap: 13px;
+        margin-top: 18px;
         padding: 14px;
-    }
-
-    .shopvote-home-strip-review:nth-child(n + 2) {
-        display: none;
     }
 
     .shopvote-home-strip-summary {
@@ -493,31 +524,64 @@
 
 @media (min-width: 768px) {
     .shopvote-home-strip {
-        grid-template-columns: minmax(170px, 0.7fr) minmax(0, 2fr);
+        grid-template-columns: minmax(180px, 0.8fr) minmax(0, 2.2fr);
         align-items: center;
-        padding: 18px;
+        padding: 20px;
     }
 
     .shopvote-home-strip-reviews {
+        grid-auto-flow: row;
+        grid-auto-columns: auto;
         grid-template-columns: repeat(2, minmax(0, 1fr));
+        overflow-x: visible;
+        padding-bottom: 0;
+        scroll-snap-type: none;
+    }
+
+    /* Two tiles fit comfortably between 768px and 1199px; the third returns at 1200px. */
+    .shopvote-home-strip-review:nth-child(n + 3) {
+        display: none;
     }
 
     .shopvote-home-strip-actions {
         grid-column: 1 / -1;
         flex-direction: row;
         align-items: center;
+        justify-content: center;
     }
 }
 
 @media (min-width: 1200px) {
     .shopvote-home-strip {
-        grid-template-columns: minmax(180px, 0.7fr) minmax(0, 2.2fr) minmax(170px, 0.7fr);
+        grid-template-columns: minmax(230px, 0.8fr) minmax(0, 3.2fr);
+        grid-template-rows: auto auto;
+        column-gap: 22px;
+        padding: 22px;
+    }
+
+    .shopvote-home-strip-summary {
+        grid-row: 1;
+        grid-column: 1;
+        align-self: end;
     }
 
     .shopvote-home-strip-actions {
-        grid-column: auto;
+        grid-row: 2;
+        grid-column: 1;
+        align-self: start;
         flex-direction: column;
         align-items: stretch;
+    }
+
+    .shopvote-home-strip-reviews {
+        grid-row: 1 / span 2;
+        grid-column: 2;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        align-self: center;
+    }
+
+    .shopvote-home-strip-review:nth-child(n + 3) {
+        display: flex;
     }
 }
 
@@ -768,10 +832,17 @@
     }
 
     .shopvote-home-strip-review {
-        border-left-color: #7da975;
+        background: #2a382a;
+        border-color: #486048;
+        box-shadow: none;
+    }
+
+    .shopvote-home-strip-review--verified {
+        border-color: #6d9a63;
     }
 
     .shopvote-home-strip-verified {
+        background: #2f4a33;
         color: #83d18f;
     }
 
@@ -851,7 +922,12 @@
 
 @media (prefers-reduced-motion: reduce) {
     .shopvote-review-item,
-    .shopvote-badge-link {
+    .shopvote-badge-link,
+    .shopvote-home-strip-review {
         transition: none;
+    }
+
+    .shopvote-home-strip-reviews {
+        scroll-behavior: auto;
     }
 }
