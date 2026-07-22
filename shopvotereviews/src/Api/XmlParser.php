@@ -70,19 +70,31 @@ class XmlParser
         $response->shopId = $this->extractString($xml, 'shopid', 64);
         $response->shopName = $this->extractString($xml, 'name', 255);
         $response->profileUrl = $this->extractShopVoteUrl($xml, 'profile');
-        $response->shopUrl = $this->extractHttpsUrl($xml, 'shopurl', 512);
+        $response->shopUrl = $this->extractHttpUrl($xml, 'shopurl', 512);
         $response->lastVote = $this->extractDateTime($xml, 'last_vote');
 
         // Extract rating summary (if present)
         if (isset($xml->rating_summary)) {
             $summary = $xml->rating_summary;
 
-            // Rating value can have different formats
+            // ShopVote documents repeated rating_value elements identified by a type attribute.
             if (isset($summary->rating_value)) {
-                $ratingValue = $summary->rating_value;
-                $response->ratingValueStars = $this->extractRating($ratingValue, 'stars');
-                $response->ratingValueScore = $this->extractBoundedFloat($ratingValue, 'score', 0.0, 100.0);
-                $response->ratingWord = $this->extractString($ratingValue, 'word', 64);
+                foreach ($summary->rating_value as $ratingValue) {
+                    $type = strtolower(trim((string) $ratingValue['type']));
+                    if ($type === 'stars') {
+                        $response->ratingValueStars = $this->parseBoundedFloat((string) $ratingValue, 1.0, 5.0);
+                    } elseif ($type === 'score') {
+                        $response->ratingValueScore = $this->parseBoundedFloat((string) $ratingValue, 1.0, 5.0);
+                    } elseif ($type === 'word') {
+                        $response->ratingWord = $this->truncateUtf8(trim((string) $ratingValue), 64);
+                    }
+                }
+
+                // Retain compatibility with nested rating_value responses.
+                $ratingValue = $summary->rating_value[0];
+                $response->ratingValueStars ??= $this->extractRating($ratingValue, 'stars');
+                $response->ratingValueScore ??= $this->extractBoundedFloat($ratingValue, 'score', 1.0, 5.0);
+                $response->ratingWord ??= $this->extractString($ratingValue, 'word', 64);
             }
 
             $response->ratingsCount = $this->extractNonNegativeInt($summary, 'ratings_count');
@@ -126,10 +138,12 @@ class XmlParser
         $review = new ParsedReview();
         $review->reviewId = $reviewId;
 
-        // Check for isVerified attribute
-        if (isset($reviewXml['isVerified'])) {
-            $review->isVerified = strtolower((string) $reviewXml['isVerified']) === 'true'
-                || (string) $reviewXml['isVerified'] === '1';
+        $verified = $this->extractString($reviewXml, 'isVerified');
+        if ($verified === null && isset($reviewXml['isVerified'])) {
+            $verified = trim((string) $reviewXml['isVerified']);
+        }
+        if ($verified !== null) {
+            $review->isVerified = strtolower($verified) === 'true' || $verified === '1';
         }
 
         $review->reviewUrl = $this->extractShopVoteUrl($reviewXml, 'review_url');
@@ -155,8 +169,15 @@ class XmlParser
         }
 
         // Parse review answers
-        if (isset($reviewXml->review_answers) && isset($reviewXml->review_answers->answer)) {
-            foreach ($reviewXml->review_answers->answer as $answerXml) {
+        $answerNodes = null;
+        if (isset($reviewXml->review_answers->answer)) {
+            $answerNodes = $reviewXml->review_answers->answer;
+        } elseif (isset($reviewXml->answers->answer)) {
+            $answerNodes = $reviewXml->answers->answer;
+        }
+
+        if ($answerNodes !== null) {
+            foreach ($answerNodes as $answerXml) {
                 $answer = $this->parseAnswer($answerXml);
                 if ($answer !== null) {
                     $review->answers[] = $answer;
@@ -174,13 +195,17 @@ class XmlParser
     {
         $answer = new ParsedAnswer();
 
-        // Get type from attribute
-        if (isset($answerXml['type'])) {
-            $type = (string) $answerXml['type'];
-            $answer->type = in_array($type, ['Shop', 'Kunde'], true) ? $type : 'Unknown';
-        } else {
-            $answer->type = 'Unknown';
+        $type = $this->extractString($answerXml, 'type', 32)
+            ?? $this->extractString($answerXml, 'author', 32);
+        if ($type === null && isset($answerXml['type'])) {
+            $type = trim((string) $answerXml['type']);
         }
+        if ($type === null && isset($answerXml['author'])) {
+            $type = trim((string) $answerXml['author']);
+        }
+
+        $type = strtolower($type ?? '');
+        $answer->type = $type === 'shop' ? 'Shop' : ($type === 'kunde' ? 'Kunde' : 'Unknown');
 
         $answer->date = $this->extractDateTime($answerXml, 'date');
         $answer->text = $this->extractString($answerXml, 'text', 65535);
@@ -272,6 +297,18 @@ class XmlParser
         return $value !== null && $value >= $minimum && $value <= $maximum ? $value : null;
     }
 
+    private function parseBoundedFloat(string $value, float $minimum, float $maximum): ?float
+    {
+        $value = str_replace(',', '.', trim($value));
+        if (!is_numeric($value)) {
+            return null;
+        }
+
+        $value = (float) $value;
+
+        return $value >= $minimum && $value <= $maximum ? $value : null;
+    }
+
     private function extractShopVoteUrl(SimpleXMLElement $xml, string $key): ?string
     {
         $url = $this->extractString($xml, $key);
@@ -283,7 +320,7 @@ class XmlParser
         return ShopVoteUrlValidator::normalize($url);
     }
 
-    private function extractHttpsUrl(SimpleXMLElement $xml, string $key, int $maxBytes): ?string
+    private function extractHttpUrl(SimpleXMLElement $xml, string $key, int $maxBytes): ?string
     {
         $url = $this->extractString($xml, $key);
         if ($url === null || strlen($url) > $maxBytes || !filter_var($url, FILTER_VALIDATE_URL)) {
@@ -292,10 +329,13 @@ class XmlParser
 
         $parts = parse_url($url);
 
-        return strtolower($parts['scheme'] ?? '') === 'https'
+        $scheme = strtolower($parts['scheme'] ?? '');
+        $port = isset($parts['port']) ? (int) $parts['port'] : null;
+
+        return in_array($scheme, ['http', 'https'], true)
             && !isset($parts['user'])
             && !isset($parts['pass'])
-            && (!isset($parts['port']) || (int) $parts['port'] === 443)
+            && ($port === null || ($scheme === 'http' && $port === 80) || ($scheme === 'https' && $port === 443))
             ? $url
             : null;
     }

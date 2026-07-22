@@ -106,16 +106,27 @@ class ConfigurationController extends FrameworkBundleAdminController
             'DISPLAY_SIDEBAR' => $request->request->getBoolean('display_sidebar'),
             'DISPLAY_PRODUCT' => $request->request->getBoolean('display_product'),
             'DISPLAY_CHECKOUT' => $request->request->getBoolean('display_checkout'),
+            'RATINGSTARS_ENABLED' => $request->request->getBoolean('ratingstars_enabled'),
             'EASYREVIEWS_ENABLED' => $request->request->getBoolean('easyreviews_enabled'),
             'PRODUCT_REVIEWS_ENABLED' => $request->request->getBoolean('product_reviews_enabled'),
         ];
 
         $errors = $this->configurationService->update($formData);
 
-        $easyReviewsSnippet = trim((string) $request->request->get('easyreviews_import_code', ''));
-        if ($easyReviewsSnippet !== '') {
+        $ratingStarsCode = (string) $request->request->get('ratingstars_code', '');
+        if (trim($ratingStarsCode) !== '') {
             try {
-                $this->configurationService->importEasyReviewsSnippet($easyReviewsSnippet);
+                $this->configurationService->importRatingStarsSnippet($ratingStarsCode);
+            } catch (\InvalidArgumentException | \RuntimeException $e) {
+                $errors['RATINGSTARS_IMPORT'] = $e->getMessage();
+            }
+        }
+
+        $easyReviewsHtml = (string) $request->request->get('easyreviews_html_code', '');
+        $easyReviewsJavascript = (string) $request->request->get('easyreviews_javascript_code', '');
+        if (trim($easyReviewsHtml) !== '' || trim($easyReviewsJavascript) !== '') {
+            try {
+                $this->configurationService->importEasyReviewsSnippets($easyReviewsHtml, $easyReviewsJavascript);
             } catch (\InvalidArgumentException | \RuntimeException $e) {
                 $errors['EASYREVIEWS_IMPORT'] = $e->getMessage();
             }

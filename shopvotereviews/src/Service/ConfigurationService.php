@@ -15,10 +15,14 @@ use ShopVoteReviews;
 class ConfigurationService
 {
     private EasyReviewsSnippetParser $easyReviewsSnippetParser;
+    private RatingStarsSnippetParser $ratingStarsSnippetParser;
 
-    public function __construct(EasyReviewsSnippetParser $easyReviewsSnippetParser)
-    {
+    public function __construct(
+        EasyReviewsSnippetParser $easyReviewsSnippetParser,
+        RatingStarsSnippetParser $ratingStarsSnippetParser
+    ) {
         $this->easyReviewsSnippetParser = $easyReviewsSnippetParser;
+        $this->ratingStarsSnippetParser = $ratingStarsSnippetParser;
     }
 
     /**
@@ -38,6 +42,18 @@ class ConfigurationService
             } elseif ($key === 'CRON_TOKEN' && !empty($value)) {
                 $config[$key] = ShopVoteReviews::maskApiKey($value);
                 $config[$key . '_SET'] = true;
+            } elseif (in_array(
+                $key,
+                ['EASYREVIEWS_HTML_CODE', 'EASYREVIEWS_JAVASCRIPT_CODE', 'RATINGSTARS_CODE'],
+                true
+            )) {
+                $storedSnippet = (string) $value;
+                if (str_starts_with($storedSnippet, 'base64:')) {
+                    $decodedSnippet = base64_decode(substr($storedSnippet, 7), true);
+                    $config[$key] = $decodedSnippet === false ? '' : $decodedSnippet;
+                } else {
+                    $config[$key] = $storedSnippet;
+                }
             } else {
                 $config[$key] = $value;
             }
@@ -94,16 +110,57 @@ class ConfigurationService
         return $errors;
     }
 
+    public function importEasyReviewsSnippets(string $htmlSnippet, string $javascriptSnippet): void
+    {
+        $this->saveEasyReviewsConfiguration(
+            $this->easyReviewsSnippetParser->parseSnippets($htmlSnippet, $javascriptSnippet),
+            $htmlSnippet,
+            $javascriptSnippet
+        );
+    }
+
+    public function importRatingStarsSnippet(string $snippet): void
+    {
+        $this->ratingStarsSnippetParser->parse($snippet);
+
+        if (!Configuration::updateValue(
+            ShopVoteReviews::CONFIG_KEYS['RATINGSTARS_CODE'],
+            'base64:' . base64_encode($snippet)
+        )) {
+            throw new \RuntimeException('The RatingStars settings could not be saved.');
+        }
+    }
+
+    /**
+     * @deprecated Use importEasyReviewsSnippets() for the two code blocks supplied by ShopVote.
+     */
     public function importEasyReviewsSnippet(string $snippet): void
     {
-        $parsed = $this->easyReviewsSnippetParser->parse($snippet);
+        $this->saveEasyReviewsConfiguration($this->easyReviewsSnippetParser->parse($snippet));
+    }
 
+    private function saveEasyReviewsConfiguration(
+        array $parsed,
+        ?string $htmlSnippet = null,
+        ?string $javascriptSnippet = null
+    ): void
+    {
         $saved = Configuration::updateValue(ShopVoteReviews::CONFIG_KEYS['EASYREVIEWS_SCRIPT_URL'], $parsed['script_url'])
             && Configuration::updateValue(ShopVoteReviews::CONFIG_KEYS['EASYREVIEWS_TOKEN'], $parsed['token'])
             && Configuration::updateValue(
-            ShopVoteReviews::CONFIG_KEYS['EASYREVIEWS_OPTIONS'],
-            json_encode($parsed['options'], JSON_UNESCAPED_SLASHES)
-        );
+                ShopVoteReviews::CONFIG_KEYS['EASYREVIEWS_OPTIONS'],
+                json_encode($parsed['options'], JSON_UNESCAPED_SLASHES)
+            );
+
+        if ($saved && $htmlSnippet !== null && $javascriptSnippet !== null) {
+            $saved = Configuration::updateValue(
+                ShopVoteReviews::CONFIG_KEYS['EASYREVIEWS_HTML_CODE'],
+                'base64:' . base64_encode($htmlSnippet)
+            ) && Configuration::updateValue(
+                ShopVoteReviews::CONFIG_KEYS['EASYREVIEWS_JAVASCRIPT_CODE'],
+                'base64:' . base64_encode($javascriptSnippet)
+            );
+        }
 
         if (!$saved) {
             throw new \RuntimeException('The EasyReviews settings could not be saved.');

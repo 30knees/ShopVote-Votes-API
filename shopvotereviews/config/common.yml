@@ -1,0 +1,49 @@
+services:
+  _defaults:
+    public: true
+
+  shopvote.api.client:
+    class: ShopVote\ShopVoteReviews\Api\ShopVoteApiClient
+    arguments:
+      - '@?prestashop.adapter.legacy.logger'
+
+  shopvote.api.xml_parser:
+    class: ShopVote\ShopVoteReviews\Api\XmlParser
+
+  shopvote.service.easyreviews_parser:
+    class: ShopVote\ShopVoteReviews\Service\EasyReviewsSnippetParser
+
+  shopvote.service.ratingstars_parser:
+    class: ShopVote\ShopVoteReviews\Service\RatingStarsSnippetParser
+
+  shopvote.repository.shop_summary:
+    class: ShopVote\ShopVoteReviews\Repository\ShopSummaryRepository
+
+  shopvote.repository.review:
+    class: ShopVote\ShopVoteReviews\Repository\ReviewRepository
+
+  shopvote.repository.sync_log:
+    class: ShopVote\ShopVoteReviews\Repository\SyncLogRepository
+
+  shopvote.repository.sync_lock:
+    class: ShopVote\ShopVoteReviews\Repository\SyncLockRepository
+
+  shopvote.repository.metrics:
+    class: ShopVote\ShopVoteReviews\Repository\MetricsRepository
+
+  shopvote.service.sync:
+    class: ShopVote\ShopVoteReviews\Service\SyncService
+    arguments:
+      - '@shopvote.api.client'
+      - '@shopvote.api.xml_parser'
+      - '@shopvote.repository.shop_summary'
+      - '@shopvote.repository.review'
+      - '@shopvote.repository.sync_log'
+      - '@shopvote.repository.sync_lock'
+      - '@shopvote.repository.metrics'
+
+  shopvote.service.configuration:
+    class: ShopVote\ShopVoteReviews\Service\ConfigurationService
+    arguments:
+      - '@shopvote.service.easyreviews_parser'
+      - '@shopvote.service.ratingstars_parser'

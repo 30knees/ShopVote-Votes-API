@@ -21,6 +21,59 @@ class XmlParserTest extends TestCase
         $this->parser = new XmlParser();
     }
 
+    public function testParsesDocumentedShopVoteSchema(): void
+    {
+        $xml = <<<'XML'
+<?xml version="1.0" encoding="UTF-8"?>
+<shoprating>
+    <shopid>1234</shopid>
+    <name>beispieldomain.de</name>
+    <profile>https://www.shopvote.de/bewertung_beispieldomain-de_1234.html</profile>
+    <shopurl>http://www.beispieldomain.de</shopurl>
+    <last_vote>2025-01-15 14:30:00</last_vote>
+    <rating_summary>
+        <rating_value type="stars">4.85</rating_value>
+        <rating_value type="score">1.15</rating_value>
+        <rating_value type="word">Sehr gut</rating_value>
+        <ratings_count>420</ratings_count>
+        <ratings_positive>400</ratings_positive>
+        <ratings_neutral>12</ratings_neutral>
+        <ratings_negative>8</ratings_negative>
+        <comments_count>360</comments_count>
+    </rating_summary>
+    <reviews>
+        <review id="123456">
+            <isVerified>1</isVerified>
+            <review_url>https://www.shopvote.de/erfahrungsbericht_beispieldomain-de_123456.html</review_url>
+            <review_rating name="stars">4.40</review_rating>
+            <review_date>2025-01-14 10:30:00</review_date>
+            <reviewer>Test User</reviewer>
+            <text>Documented review</text>
+            <review_answers>
+                <answer>
+                    <type>Shop</type>
+                    <date>2025-01-14 11:00:00</date>
+                    <text>Documented answer</text>
+                </answer>
+            </review_answers>
+        </review>
+    </reviews>
+</shoprating>
+XML;
+
+        $result = $this->parser->parse($xml);
+
+        $this->assertTrue($result->hasSummary);
+        $this->assertSame(4.85, $result->ratingValueStars);
+        $this->assertSame(1.15, $result->ratingValueScore);
+        $this->assertSame('Sehr gut', $result->ratingWord);
+        $this->assertSame('http://www.beispieldomain.de', $result->shopUrl);
+        $this->assertTrue($result->hasReviews);
+        $this->assertSame(4.4, $result->reviews[0]->reviewRatingStars);
+        $this->assertTrue($result->reviews[0]->isVerified);
+        $this->assertSame('Shop', $result->reviews[0]->answers[0]->type);
+    }
+
     /**
      * Test parsing ratingstars response
      */
@@ -37,7 +90,7 @@ class XmlParserTest extends TestCase
     <rating_summary>
         <rating_value>
             <stars>4.5</stars>
-            <score>90</score>
+            <score>1.10</score>
             <word>sehr gut</word>
         </rating_value>
         <ratings_count>150</ratings_count>
@@ -61,7 +114,7 @@ XML;
 
         $this->assertTrue($result->hasSummary);
         $this->assertEquals(4.5, $result->ratingValueStars);
-        $this->assertEquals(90.0, $result->ratingValueScore);
+        $this->assertEquals(1.1, $result->ratingValueScore);
         $this->assertEquals('sehr gut', $result->ratingWord);
         $this->assertEquals(150, $result->ratingsCount);
         $this->assertEquals(140, $result->ratingsPositive);
@@ -159,7 +212,7 @@ XML;
     <rating_summary>
         <rating_value>
             <stars>4.7</stars>
-            <score>94</score>
+            <score>1.06</score>
             <word>sehr gut</word>
         </rating_value>
         <ratings_count>200</ratings_count>
@@ -233,7 +286,7 @@ XML;
     <rating_summary>
         <rating_value>
             <stars>4,5</stars>
-            <score>90,5</score>
+            <score>1,5</score>
         </rating_value>
         <ratings_count>100</ratings_count>
     </rating_summary>
@@ -243,7 +296,7 @@ XML;
         $result = $this->parser->parse($xml);
 
         $this->assertEquals(4.5, $result->ratingValueStars);
-        $this->assertEquals(90.5, $result->ratingValueScore);
+        $this->assertEquals(1.5, $result->ratingValueScore);
     }
 
     /**

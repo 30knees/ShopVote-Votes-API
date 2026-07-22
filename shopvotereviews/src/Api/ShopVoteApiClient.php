@@ -26,6 +26,9 @@ class ShopVoteApiClient
     /** @var int Maximum accepted response size (2 MiB) */
     private const MAX_RESPONSE_BYTES = 2097152;
 
+    /** @var string Provider-specific CA chain used while ShopVote omits its intermediate certificate */
+    private const CA_BUNDLE_PATH = __DIR__ . '/../../resources/certs/shopvote-ca-chain.pem';
+
     /** @var array Valid API functions */
     public const FUNCTIONS = [
         'ratingstars',
@@ -150,7 +153,7 @@ class ShopVoteApiClient
         $responseBody = '';
         $responseTooLarge = false;
 
-        curl_setopt_array($ch, [
+        $options = [
             CURLOPT_URL => $url,
             CURLOPT_RETURNTRANSFER => false,
             CURLOPT_FOLLOWLOCATION => false,
@@ -174,7 +177,13 @@ class ShopVoteApiClient
 
                 return strlen($chunk);
             },
-        ]);
+        ];
+
+        if (is_readable(self::CA_BUNDLE_PATH)) {
+            $options[CURLOPT_CAINFO] = self::CA_BUNDLE_PATH;
+        }
+
+        curl_setopt_array($ch, $options);
 
         curl_exec($ch);
         $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -188,6 +197,10 @@ class ShopVoteApiClient
         }
 
         if ($errno !== 0) {
+            if ($errno === 60) {
+                $error = 'TLS certificate chain could not be verified. The remote server may not be sending its intermediate certificate. ' . $error;
+            }
+
             return new ApiResponse(
                 false,
                 0,

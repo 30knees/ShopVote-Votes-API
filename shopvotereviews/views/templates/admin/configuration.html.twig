@@ -158,10 +158,13 @@
                         </div>
 
                         <div class="form-group row">
-                            <label class="form-control-label col-lg-3">{{ 'Display in Sidebar'|trans({}, 'Modules.Shopvotereviews.Admin') }}</label>
-                            <div class="col-lg-9"><div class="form-check form-switch">
-                                <input type="checkbox" class="form-check-input" name="display_sidebar" value="1" {{ config.DISPLAY_SIDEBAR ? 'checked' : '' }}>
-                            </div></div>
+                            <label class="form-control-label col-lg-3">{{ 'Display in Theme Side Column'|trans({}, 'Modules.Shopvotereviews.Admin') }}</label>
+                            <div class="col-lg-9">
+                                <div class="form-check form-switch">
+                                    <input type="checkbox" class="form-check-input" name="display_sidebar" value="1" {{ config.DISPLAY_SIDEBAR ? 'checked' : '' }}>
+                                </div>
+                                <small class="form-text text-muted">{{ 'Shown only on pages whose active theme layout renders a left or right column.'|trans({}, 'Modules.Shopvotereviews.Admin') }}</small>
+                            </div>
                         </div>
 
                         <div class="form-group row">
@@ -194,6 +197,26 @@
                         <h4>{{ 'Optional ShopVote Add-ons'|trans({}, 'Modules.Shopvotereviews.Admin') }}</h4>
 
                         <div class="form-group row">
+                            <label class="form-control-label col-lg-3">{{ 'Enable Floating RatingStars Badge'|trans({}, 'Modules.Shopvotereviews.Admin') }}</label>
+                            <div class="col-lg-9">
+                                <div class="form-check form-switch">
+                                    <input type="checkbox" class="form-check-input" name="ratingstars_enabled" value="1" {{ config.RATINGSTARS_ENABLED ? 'checked' : '' }}>
+                                </div>
+                                <small class="form-text text-muted">{{ 'Displays ShopVote’s hosted floating badge on every storefront page, including full-width layouts.'|trans({}, 'Modules.Shopvotereviews.Admin') }}</small>
+                            </div>
+                        </div>
+
+                        <div class="form-group row">
+                            <label class="form-control-label col-lg-3" for="ratingstars_code">{{ 'RatingStars JavaScript code'|trans({}, 'Modules.Shopvotereviews.Admin') }}</label>
+                            <div class="col-lg-9">
+                                <textarea class="form-control" name="ratingstars_code" id="ratingstars_code" rows="8" autocomplete="off">{{ config.RATINGSTARS_CODE|e('html') }}</textarea>
+                                <small class="form-text text-muted">{{ 'Paste the complete floating badge code from Graphics & Seals as supplied by ShopVote, including defer and the loadBadge wrapper. The source remains editable; only validated HTTPS code from widgets.shopvote.de is rendered.'|trans({}, 'Modules.Shopvotereviews.Admin') }}</small>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <div class="form-group row">
                             <label class="form-control-label col-lg-3">{{ 'Enable EasyReviews'|trans({}, 'Modules.Shopvotereviews.Admin') }}</label>
                             <div class="col-lg-9"><div class="form-check form-switch">
                                 <input type="checkbox" class="form-check-input" name="easyreviews_enabled" value="1" {{ config.EASYREVIEWS_ENABLED ? 'checked' : '' }}>
@@ -201,10 +224,18 @@
                         </div>
 
                         <div class="form-group row">
-                            <label class="form-control-label col-lg-3" for="easyreviews_import_code">{{ 'Import EasyReviews HTML/JavaScript snippet'|trans({}, 'Modules.Shopvotereviews.Admin') }}</label>
+                            <label class="form-control-label col-lg-3" for="easyreviews_html_code">{{ 'EasyReviews HTML code'|trans({}, 'Modules.Shopvotereviews.Admin') }}</label>
                             <div class="col-lg-9">
-                                <textarea class="form-control" name="easyreviews_import_code" id="easyreviews_import_code" rows="5" autocomplete="off"></textarea>
-                                <small class="form-text text-muted">{{ 'Paste the complete EasyReviews HTML snippet from your ShopVote merchant account, including the script tags and JavaScript configuration. The module stores only the validated ShopVote HTTPS script URL, token, and supported options; the pasted code is discarded.'|trans({}, 'Modules.Shopvotereviews.Admin') }}</small>
+                                <textarea class="form-control" name="easyreviews_html_code" id="easyreviews_html_code" rows="5" autocomplete="off">{{ config.EASYREVIEWS_HTML_CODE|e('html') }}</textarea>
+                                <small class="form-text text-muted">{{ 'Paste the HTML code supplied under EasyReviews in your ShopVote merchant account.'|trans({}, 'Modules.Shopvotereviews.Admin') }}</small>
+                            </div>
+                        </div>
+
+                        <div class="form-group row">
+                            <label class="form-control-label col-lg-3" for="easyreviews_javascript_code">{{ 'EasyReviews JavaScript code'|trans({}, 'Modules.Shopvotereviews.Admin') }}</label>
+                            <div class="col-lg-9">
+                                <textarea class="form-control" name="easyreviews_javascript_code" id="easyreviews_javascript_code" rows="7" autocomplete="off">{{ config.EASYREVIEWS_JAVASCRIPT_CODE|e('html') }}</textarea>
+                                <small class="form-text text-muted">{{ 'Paste the JavaScript code supplied alongside the HTML code. Both fields are required. The saved source remains editable here; only its validated ShopVote HTTPS URL, token, and supported options are used on the storefront.'|trans({}, 'Modules.Shopvotereviews.Admin') }}</small>
                             </div>
                         </div>
 
@@ -261,18 +292,19 @@
                 </div>
                 <div class="card-body">
                     <div class="form-group">
-                        <label>{{ 'Deprecated compatibility URL'|trans({}, 'Modules.Shopvotereviews.Admin') }}</label>
+                        <label>{{ 'Hetzner konsoleH crontab entry (Erweiterte Ansicht):'|trans({}, 'Modules.Shopvotereviews.Admin') }}</label>
+                        <pre class="bg-light p-2"><code>*/15 * * * * /usr/bin/curl "{{ cron_url }}"</code></pre>
                         <div class="input-group">
                             <input type="text" class="form-control" id="cron-url" value="{{ cron_url }}" readonly>
                             <button type="button" class="btn btn-outline-secondary" onclick="navigator.clipboard.writeText(document.getElementById('cron-url').value)">
                                 <i class="material-icons">content_copy</i>
                             </button>
                         </div>
-                        <small class="form-text text-warning">{{ 'Query-string authentication remains available for 1.1 compatibility, but URLs can be recorded in logs. Use the authenticated POST command below.'|trans({}, 'Modules.Shopvotereviews.Admin') }}</small>
+                        <small class="form-text text-warning">{{ 'Paste the complete line into the Hetzner Cronjob Manager under Erweiterte Ansicht. The token is included in the URL and can be recorded in logs.'|trans({}, 'Modules.Shopvotereviews.Admin') }}</small>
                     </div>
                     <div class="form-group">
-                        <label>{{ 'Preferred authenticated POST crontab entry:'|trans({}, 'Modules.Shopvotereviews.Admin') }}</label>
-                        <pre class="bg-light p-2"><code>*/15 * * * * curl -sS -X POST -H "Authorization: Bearer {{ cron_token }}" "{{ cron_endpoint }}" &gt; /dev/null</code></pre>
+                        <label>{{ 'Bearer-token POST alternative:'|trans({}, 'Modules.Shopvotereviews.Admin') }}</label>
+                        <pre class="bg-light p-2"><code>*/15 * * * * /usr/bin/curl -sS -X POST -H "Authorization: Bearer {{ cron_token }}" "{{ cron_endpoint }}" &gt; /dev/null</code></pre>
                     </div>
                     <button type="button" class="btn btn-warning" id="btn-rotate-token">
                         <i class="material-icons">refresh</i>
@@ -515,6 +547,12 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <style>
+.shopvote-configuration .form-check.form-switch {
+    min-height: 1.5rem;
+}
+.shopvote-configuration .form-check.form-switch + .form-text {
+    margin-top: .25rem;
+}
 .shopvote-configuration .material-icons.spin {
     animation: spin 1s linear infinite;
 }

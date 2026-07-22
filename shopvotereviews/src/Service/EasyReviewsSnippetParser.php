@@ -14,6 +14,21 @@ class EasyReviewsSnippetParser
     /**
      * @return array{script_url:string, token:string, options:array}
      */
+    public function parseSnippets(string $htmlSnippet, string $javascriptSnippet): array
+    {
+        if (trim($htmlSnippet) === '') {
+            throw new \InvalidArgumentException('The EasyReviews HTML code is required.');
+        }
+        if (trim($javascriptSnippet) === '') {
+            throw new \InvalidArgumentException('The EasyReviews JavaScript code is required.');
+        }
+
+        return $this->parse($htmlSnippet . "\n" . $javascriptSnippet);
+    }
+
+    /**
+     * @return array{script_url:string, token:string, options:array}
+     */
     public function parse(string $snippet): array
     {
         if (strlen($snippet) > 32768) {
@@ -53,7 +68,7 @@ class EasyReviewsSnippetParser
         }
 
         $options = [];
-        if (preg_match('/\b(?:language|lang)\s*[:=]\s*(["\'])([a-z]{2})\1/i', $snippet, $match)) {
+        if (preg_match('/\b(?:myLanguage|language|lang)\s*[:=]\s*(["\'])([a-z]{2})\1/i', $snippet, $match)) {
             $options['language'] = strtolower($match[2]);
         }
         if (preg_match('/\b(?:delay|days)\s*[:=]\s*(\d{1,3})\b/i', $snippet, $match)) {

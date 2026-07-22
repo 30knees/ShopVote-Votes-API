@@ -8,6 +8,7 @@ config.*.env
 *.secret
 *.key
 *.pem
+!shopvotereviews/resources/certs/shopvote-ca-chain.pem
 *.p12
 *.pfx
 .claude/

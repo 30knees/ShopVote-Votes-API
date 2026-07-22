@@ -11,6 +11,7 @@ namespace ShopVote\ShopVoteReviews\Install;
 
 use Configuration;
 use Db;
+use Hook;
 use Module;
 use ShopVoteReviews;
 use Tab;
@@ -29,6 +30,8 @@ class Installer
         'displayHome',
         'displayLeftColumn',
         'displayRightColumn',
+        'displayLeftColumnProduct',
+        'displayRightColumnProduct',
         'displayProductAdditionalInfo',
         'displayCheckoutSummaryTop',
         'displayOrderConfirmation',
@@ -61,10 +64,14 @@ class Installer
         'DISPLAY_SIDEBAR' => true,
         'DISPLAY_PRODUCT' => false,
         'DISPLAY_CHECKOUT' => false,
+        'RATINGSTARS_ENABLED' => false,
+        'RATINGSTARS_CODE' => '',
         'EASYREVIEWS_ENABLED' => false,
         'EASYREVIEWS_SCRIPT_URL' => '',
         'EASYREVIEWS_TOKEN' => '',
         'EASYREVIEWS_OPTIONS' => '{}',
+        'EASYREVIEWS_HTML_CODE' => '',
+        'EASYREVIEWS_JAVASCRIPT_CODE' => '',
         'PRODUCT_REVIEWS_ENABLED' => false,
         'EVENT_SECRET' => '',
     ];
@@ -81,6 +88,7 @@ class Installer
     {
         return $this->createTables()
             && $this->registerHooks()
+            && $this->positionHomepageFirst()
             && $this->installConfiguration()
             && $this->installTab();
     }
@@ -240,6 +248,21 @@ class Installer
             if (!$this->module->registerHook($hook)) {
                 return false;
             }
+        }
+
+        return true;
+    }
+
+    /** Place the compact trust strip before other displayHome modules. */
+    private function positionHomepageFirst(): bool
+    {
+        $hookId = (int) Hook::getIdByName('displayHome');
+        if ($hookId <= 0) {
+            return true;
+        }
+
+        while ($this->module->updatePosition($hookId, 0)) {
+            // updatePosition moves one place at a time.
         }
 
         return true;

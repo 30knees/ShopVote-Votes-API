@@ -4,7 +4,7 @@
  *}
 
 {if $shopvote_has_data}
-<section class="shopvote-reviews-block"
+<section class="shopvote-reviews-block{if $shopvote_placement == 'reviews_page'} shopvote-reviews-block--page{/if}"
          data-shopvote-metric-endpoint="{$shopvote_metric_endpoint|escape:'htmlall':'UTF-8'}"
          data-shopvote-placement="{$shopvote_placement|escape:'htmlall':'UTF-8'}"
          data-shopvote-metric-expires="{$shopvote_metric_expires|intval}"
@@ -12,7 +12,9 @@
          data-shopvote-view-signature="{$shopvote_view_signature|escape:'htmlall':'UTF-8'}"
          data-shopvote-click-signature="{$shopvote_click_signature|escape:'htmlall':'UTF-8'}">
     <div class="shopvote-reviews-header">
+        {if $shopvote_placement != 'reviews_page'}
         <h2 class="shopvote-reviews-title">{l s='What Our Customers Say' d='Modules.Shopvotereviews.Shop'}</h2>
+        {/if}
 
         {if $shopvote_summary}
         <div class="shopvote-reviews-summary">
