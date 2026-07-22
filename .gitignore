@@ -29,3 +29,6 @@ venv/
 vendor/
 node_modules/
 *.log
+
+# --- repo-specific ---
+.phpunit.result.cache
