@@ -51,7 +51,11 @@
 
     <div class="shopvote-home-strip-actions">
         <a href="{$shopvote_reviews_url|escape:'htmlall':'UTF-8'}" class="shopvote-home-strip-cta btn btn-primary">
-            {l s='Latest customer reviews' d='Modules.Shopvotereviews.Shop'}
+            {if $shopvote_summary && $shopvote_summary.ratings_count > 0}
+                {l s='Read all %count% reviews' sprintf=['%count%' => $shopvote_summary.ratings_count|intval] d='Modules.Shopvotereviews.Shop'}
+            {else}
+                {l s='Latest customer reviews' d='Modules.Shopvotereviews.Shop'}
+            {/if}
         </a>
         {if $shopvote_profile_url}
         <a href="{$shopvote_profile_url|escape:'htmlall':'UTF-8'}" target="_blank" rel="noopener noreferrer" class="shopvote-home-strip-source">

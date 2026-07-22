@@ -44,7 +44,23 @@ class HomepageReviewsStripTest extends TestCase
         $this->assertStringContainsString('@media (min-width: 768px)', $stylesheet);
         $this->assertStringContainsString('@media (min-width: 1200px)', $stylesheet);
         $this->assertStringContainsString('@media (max-width: 767px)', $stylesheet);
-        $this->assertStringContainsString('.shopvote-home-strip-review:nth-child(n + 2)', $stylesheet);
         $this->assertStringContainsString('overflow-wrap: anywhere;', $stylesheet);
+        // Mobile shows a swipeable card row; tablet caps at two tiles, desktop restores the third.
+        $this->assertStringContainsString('scroll-snap-type: x mandatory;', $stylesheet);
+        $this->assertStringContainsString('.shopvote-home-strip-review:nth-child(n + 3)', $stylesheet);
+        $this->assertStringContainsString('grid-template-columns: repeat(3, minmax(0, 1fr));', $stylesheet);
+    }
+
+    public function testStripRendersTilesWithVerifiedBadgeAndDynamicCta(): void
+    {
+        $strip = file_get_contents(__DIR__ . '/../../views/templates/hook/reviews_strip.tpl');
+        $stylesheet = file_get_contents(__DIR__ . '/../../views/css/shopvote.css');
+
+        $this->assertIsString($strip);
+        $this->assertStringContainsString('shopvote-home-strip-review--verified', $strip);
+        $this->assertStringContainsString("Read all %count% reviews", $strip);
+        $this->assertIsString($stylesheet);
+        $this->assertStringContainsString('.shopvote-home-strip-review--verified', $stylesheet);
+        $this->assertStringContainsString('border-radius: 999px;', $stylesheet);
     }
 }
